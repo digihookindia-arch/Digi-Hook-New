@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la && echo \"---DOWNLOADS---\" && ls -la /c/Users/Amy/Downloads/ | head -30)",
+      "Bash(unzip -o \"/c/Users/Amy/Downloads/Digi Hook premium website design.zip\" -d .)",
+      "Read(//tmp/**)",
+      "Bash(npm -v)",
+      "Bash(curl -sI https://registry.npmjs.org/)",
+      "Bash(curl -sI \"https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth,wght%5D.ttf\")",
+      "Bash(pip install *)",
+      "Bash(python -m pip install fonttools brotli)",
+      "Bash(py -m pip install fonttools brotli)",
+      "Bash(curl -s \"https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap\" -H \"User-Agent: Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/120.0 Safari/537.36\" -o /tmp/archivo.css)",
+      "Bash(grep -o \"/\\\\* [a-z-]* \\\\*/\" /tmp/archivo.css)",
+      "Bash(npm init *)",
+      "Bash(npm i *)",
+      "Bash(npm install *)",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth,wght%5D.ttf\" -o Archivo.ttf)",
+      "Bash(sed -i \"s/\\\\\\\\\\\\\\\\u2122'; \\\\/\\\\/.*/\\\\\\\\\\\\\\\\u2122\\\\\\\\\\\\\\\\u2264\\\\\\\\\\\\\\\\u2265\\\\\\\\\\\\\\\\u2248\\\\\\\\\\\\\\\\u00BD\\\\\\\\\\\\\\\\u00BC\\\\\\\\\\\\\\\\u00BE'; \\\\/\\\\/ symbols/\" sub.mjs)",
+      "Bash(node sub.mjs Archivo.ttf /d/Web2/public/fonts/Archivo-subset.woff2)",
+      "Bash(curl -s \"http://localhost:3000/_next/static/css/app/layout.css?v=1784951209505\")",
+      "Bash(node extract.mjs \"/d/Web2/design_handoff_digihook_website/Digi Hook Site.dc.html\" \"/d/Web2/content\")",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(grep -oE 'text-\\\\[[0-9.]+px\\\\][^\"`]*text-accent\\\\b|text-accent\\\\b[^\"`]*text-\\\\[[0-9.]+px\\\\]')",
+      "Bash(npx next *)",
+      "Bash(curl -s http://localhost:3000/sitemap.xml)",
+      "Bash(curl -s http://localhost:3000/robots.txt)",
+      "Bash(npx --yes tsx _test-enquiry.ts)",
+      "Bash(npm test *)",
+      "PowerShell(if \\($env:ANTHROPIC_API_KEY\\) { \"ANTHROPIC_API_KEY present in shell env, length \" + $env:ANTHROPIC_API_KEY.Length } else { \"ANTHROPIC_API_KEY not set in shell env\" }; if \\($env:MONGODB_URI\\) { \"MONGODB_URI present\" } else { \"MONGODB_URI not set in shell env\" })",
+      "PowerShell(node --version)",
+      "Bash(grep -v '^$')",
+      "Bash(curl -s http://localhost:3000/knowledge-hub/nextjs-or-wordpress -o /tmp/b.html)",
+      "Bash(curl -s http://localhost:3000/knowledge-hub)",
+      "PowerShell(npm test 2>&1)",
+      "PowerShell(npx next lint 2>&1)"
+    ]
+  }
+}

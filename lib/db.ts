@@ -1,0 +1,130 @@
+import { DatabaseSync } from 'node:sqlite';
+import { mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+
+/**
+ * SQLite storage, cached across hot reloads.
+ *
+ * Next.js re-evaluates modules on every edit in development, so a plain
+ * module-level handle would open a new connection per reload and leak file
+ * descriptors. Stashing it on `globalThis` keeps one handle per process.
+ *
+ * `node:sqlite` ships with Node (24+), so there is nothing to install and no
+ * native module to compile — the whole database is one file on disk.
+ */
+
+const file = resolve(process.env.SQLITE_PATH ?? 'data/digihook.db');
+
+declare global {
+  // eslint-disable-next-line no-var
+  var _dhSqlite: DatabaseSync | undefined;
+}
+
+/**
+ * Proposals are stored one row per proposal. `content` is the JSON blob Claude
+ * returns — it is read and written whole, never queried into, so there is no
+ * reason to spread it across columns.
+ *
+ * assets/milestones/stages are the studio's own working data, kept deliberately
+ * separate from `content`: Claude writes the proposal, the studio tracks the
+ * delivery, and a revision must never overwrite what has actually been paid.
+ */
+const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS proposals (
+    slug        TEXT PRIMARY KEY,
+    client      TEXT NOT NULL,
+    access_code TEXT NOT NULL,
+    content     TEXT NOT NULL,
+    brief       TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    assets      TEXT NOT NULL DEFAULT '[]',
+    milestones  TEXT NOT NULL DEFAULT '[]',
+    stages      TEXT NOT NULL DEFAULT '[]',
+    accepted_at TEXT,
+    assets_shared_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS proposals_created_at ON proposals (created_at DESC);
+
+  /*
+   * Enquiries from the public contact form. The answers column is the pruned
+   * branching answer set as JSON; name/email/phone/company are promoted out of
+   * it into columns so the dashboard can list, search and mail on them without
+   * parsing every row. proposal_slug is set once a proposal is drafted from it.
+   */
+  CREATE TABLE IF NOT EXISTS enquiries (
+    id            TEXT PRIMARY KEY,
+    created_at    TEXT NOT NULL,
+    service       TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    email         TEXT NOT NULL,
+    phone         TEXT NOT NULL,
+    company       TEXT,
+    answers       TEXT NOT NULL,
+    summary       TEXT NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'new',
+    proposal_slug TEXT
+  );
+  CREATE INDEX IF NOT EXISTS enquiries_created_at ON enquiries (created_at DESC);
+  CREATE INDEX IF NOT EXISTS enquiries_status ON enquiries (status);
+`;
+
+/**
+ * CREATE TABLE IF NOT EXISTS is a no-op on a table that already exists, so a
+ * column added to SCHEMA after the fact never reaches a database created
+ * before it. This adds one if it is missing, which is the whole migration
+ * story this app needs — columns are only ever added, never dropped or
+ * retyped. ALTER TABLE ADD COLUMN requires a constant default, hence '[]'.
+ */
+function addColumnIfMissing(
+  db: DatabaseSync,
+  table: string,
+  column: string,
+  definition: string
+): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as {
+    name: string;
+  }[];
+  if (columns.some((c) => c.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+export function getDb(): DatabaseSync {
+  if (!global._dhSqlite) {
+    mkdirSync(dirname(file), { recursive: true });
+    const db = new DatabaseSync(file);
+    // WAL keeps reads from blocking behind a write, which matters because every
+    // dashboard page render reads while a draft may still be saving.
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec(SCHEMA);
+    // Proposals stored before the delivery tabs existed predate these three.
+    addColumnIfMissing(db, 'proposals', 'assets', "TEXT NOT NULL DEFAULT '[]'");
+    addColumnIfMissing(db, 'proposals', 'milestones', "TEXT NOT NULL DEFAULT '[]'");
+    addColumnIfMissing(db, 'proposals', 'stages', "TEXT NOT NULL DEFAULT '[]'");
+    // Set when the client (or the studio, after a call) accepts the proposal.
+    // Gates the What-we-need and Status tabs on the client-facing page.
+    addColumnIfMissing(db, 'proposals', 'accepted_at', 'TEXT');
+    // Set when the studio publishes the asset list. Until then an accepted
+    // client sees "we will send this within 24 hours" rather than the
+    // auto-seeded draft the studio has not looked at yet.
+    addColumnIfMissing(db, 'proposals', 'assets_shared_at', 'TEXT');
+    global._dhSqlite = db;
+  }
+  return global._dhSqlite;
+}
+
+/**
+ * True when the dashboard can actually store proposals. SQLite needs no
+ * configuration, so this only fails when the data directory is not writable.
+ */
+export function isDbConfigured(): boolean {
+  try {
+    getDb();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Where the database lives, for the dashboard to show when something breaks. */
+export const dbFile = file;
