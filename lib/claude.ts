@@ -22,7 +22,7 @@ import type { ProposalContent } from './proposals';
  * house voice and the pricing rules than the larger models do. Set
  * PROPOSAL_MODEL to move back up a tier.
  */
-const MODEL = process.env.PROPOSAL_MODEL ?? 'claude-haiku-4-5';
+const MODEL = process.env.PROPOSAL_MODEL ?? 'claude-sonnet-5';
 
 /**
  * Effort tunes thinking depth, but Haiku 4.5 rejects the parameter outright —
@@ -253,26 +253,6 @@ table only when search visibility is part of the scope, and an admin/dashboard
 table only when the build includes one. Only include what this project actually
 gets — the annexure is a factual inventory, not a brochure.`;
 
-/**
- * A revision returns only the top-level fields it actually changes; everything
- * omitted is left alone. Regenerating the whole document to move one date cost
- * twice as much for no benefit.
- */
-const PATCH_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['changed'],
-  properties: {
-    changed: {
-      type: 'object',
-      additionalProperties: false,
-      description:
-        'Only the top-level fields this change affects, each complete and in full. Omit every field that stays the same.',
-      properties: PROPOSAL_SCHEMA.properties,
-    },
-  },
-} as const;
-
 type ClaudeResult =
   | { ok: true; content: ProposalContent }
   | { ok: false; error: string };
@@ -351,9 +331,18 @@ export async function draftProposal(input: {
 /**
  * Revise an existing proposal against an instruction.
  *
- * Claude returns only the fields the instruction touches; the rest is carried
- * over unchanged from `current`. The proposal still has to be sent in full so
- * Claude can see what it is editing, but not written back out in full.
+ * Returns the complete updated proposal rather than a partial patch. A patch
+ * schema was tried first — the same PROPOSAL_SCHEMA with every top-level
+ * field made optional so Claude could omit whatever stayed the same — but
+ * Anthropic's structured-output complexity ceiling scales with how many
+ * top-level fields are optional (each one multiplies the shapes the
+ * validator has to account for). PROPOSAL_SCHEMA itself only has 3 optional
+ * fields (technology, support, annexure) out of 11 and is already close to
+ * the limit; making all 11 optional pushed every single revision request
+ * over it — a 400 "Schema is too complex" on every attempt, confirmed live.
+ * Reusing PROPOSAL_SCHEMA exactly as the draft call does (same required
+ * list) is the only version confirmed to work, so revision costs roughly
+ * the same as a fresh draft — worth it for a feature that actually runs.
  */
 export async function reviseProposal(input: {
   client: string;
@@ -363,19 +352,12 @@ export async function reviseProposal(input: {
   const result = await ask(
     `Revise the proposal below for ${input.client}.\n\n` +
       `Change requested by our team:\n${input.instruction}\n\n` +
-      `Return only the top-level fields this change actually alters, each complete and in full. ` +
-      `Omit every field that stays the same.\n\n` +
+      `Return the complete, updated proposal as a single JSON object in the same shape. ` +
+      `Apply the requested change, and copy every other field over exactly as it is below — ` +
+      `do not rewrite, rephrase or "improve" anything that was not asked for.\n\n` +
       `Current proposal (JSON):\n${JSON.stringify(input.current)}`,
-    PATCH_SCHEMA
+    PROPOSAL_SCHEMA
   );
   if (!result.ok) return result;
-
-  const { changed } = result.parsed as { changed?: Partial<ProposalContent> };
-  if (!changed || Object.keys(changed).length === 0) {
-    return {
-      ok: false,
-      error: 'Claude did not change anything. Try describing the change more specifically.',
-    };
-  }
-  return { ok: true, content: { ...input.current, ...changed } };
+  return { ok: true, content: result.parsed as ProposalContent };
 }
