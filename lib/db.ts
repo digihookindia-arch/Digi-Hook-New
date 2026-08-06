@@ -67,6 +67,30 @@ const SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS enquiries_created_at ON enquiries (created_at DESC);
   CREATE INDEX IF NOT EXISTS enquiries_status ON enquiries (status);
+
+  /*
+   * Leads from the /get-quote ad funnel. Separate from enquiries because the
+   * shape differs: no email, budget is either an accepted range or a custom
+   * number, and answers branch per website type. name/business/phone/budget
+   * are promoted into columns so the dashboard lists without parsing JSON;
+   * answers holds the full pruned set; source holds UTM/fbclid attribution.
+   */
+  CREATE TABLE IF NOT EXISTS quote_leads (
+    id            TEXT PRIMARY KEY,
+    created_at    TEXT NOT NULL,
+    website_type  TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    business      TEXT NOT NULL,
+    phone         TEXT NOT NULL,
+    budget_agreed TEXT NOT NULL,
+    budget        TEXT NOT NULL,
+    contact_time  TEXT NOT NULL,
+    answers       TEXT NOT NULL,
+    source        TEXT,
+    status        TEXT NOT NULL DEFAULT 'new'
+  );
+  CREATE INDEX IF NOT EXISTS quote_leads_created_at ON quote_leads (created_at DESC);
+  CREATE INDEX IF NOT EXISTS quote_leads_status ON quote_leads (status);
 `;
 
 /**

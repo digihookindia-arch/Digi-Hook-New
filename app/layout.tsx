@@ -12,6 +12,7 @@ import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { ScrollProgress } from '@/components/ScrollProgress';
 import { PageTransition } from '@/components/PageTransition';
+import { SiteChrome } from '@/components/SiteChrome';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -49,10 +50,15 @@ export default function RootLayout({
         <JsonLd
           data={[organizationSchema(), webSiteSchema(), localBusinessSchema()]}
         />
-        <ScrollProgress />
-        <Header />
+        {/* Chrome-free on /get-quote — the ad funnel must not leak clicks. */}
+        <SiteChrome>
+          <ScrollProgress />
+          <Header />
+        </SiteChrome>
         <PageTransition>{children}</PageTransition>
-        <Footer />
+        <SiteChrome>
+          <Footer />
+        </SiteChrome>
       </body>
     </html>
   );

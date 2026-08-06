@@ -124,6 +124,27 @@ body {
   }
 }
 
+/* -- get-quote success tick --
+   Circle draws first, then the check strokes in. The reduced-motion block
+   below collapses both to their final state instantly (forwards fill). */
+.dh-tick circle {
+  stroke-dasharray: 183;
+  stroke-dashoffset: 183;
+  animation: dh-draw 500ms ease-out forwards;
+}
+
+.dh-tick path {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: dh-draw 350ms ease-out 450ms forwards;
+}
+
+@keyframes dh-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 /* -- reduced motion --
    The prototype had no reduced-motion support; the README requires it.
    Kill the ambient/decorative animations (marquee, hero grid, caret, reveals,

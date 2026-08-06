@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Plus, Trash2, ExternalLink } from 'lucide-react';
 import { listProposals } from '@/lib/proposals';
 import { newEnquiryCount } from '@/lib/enquiries';
+import { newQuoteLeadCount } from '@/lib/quoteLeads';
 import { isDbConfigured, dbFile } from '@/lib/db';
 import { isClaudeConfigured } from '@/lib/claude';
 import { requireSession, removeProposal, signOut } from './actions';
@@ -14,6 +15,7 @@ export default async function DashboardPage() {
   const configured = isDbConfigured();
   const proposals = configured ? await listProposals() : [];
   const newCount = configured ? await newEnquiryCount() : 0;
+  const newQuoteCount = configured ? await newQuoteLeadCount() : 0;
 
   return (
     <main>
@@ -36,6 +38,17 @@ export default async function DashboardPage() {
               {newCount > 0 ? (
                 <span className="border-2 border-accent-600 bg-accent-600 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
                   {newCount}
+                </span>
+              ) : null}
+            </Link>
+            <Link
+              href="/dashboard/quote-leads"
+              className="inline-flex items-center gap-2 border-2 border-text px-4 py-3.5 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
+            >
+              Quote leads
+              {newQuoteCount > 0 ? (
+                <span className="border-2 border-accent-600 bg-accent-600 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
+                  {newQuoteCount}
                 </span>
               ) : null}
             </Link>
