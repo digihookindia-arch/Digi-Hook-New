@@ -42,7 +42,8 @@ const SCHEMA = `
     milestones  TEXT NOT NULL DEFAULT '[]',
     stages      TEXT NOT NULL DEFAULT '[]',
     accepted_at TEXT,
-    assets_shared_at TEXT
+    assets_shared_at TEXT,
+    budget      TEXT NOT NULL DEFAULT ''
   );
   CREATE INDEX IF NOT EXISTS proposals_created_at ON proposals (created_at DESC);
 
@@ -132,6 +133,10 @@ export function getDb(): DatabaseSync {
     // client sees "we will send this within 24 hours" rather than the
     // auto-seeded draft the studio has not looked at yet.
     addColumnIfMissing(db, 'proposals', 'assets_shared_at', 'TEXT');
+    // The budget the team agreed with the client before drafting, so Claude
+    // prices against a real figure instead of picking from the house list.
+    // Proposals stored before this existed read back as ''.
+    addColumnIfMissing(db, 'proposals', 'budget', "TEXT NOT NULL DEFAULT ''");
     global._dhSqlite = db;
   }
   return global._dhSqlite;

@@ -76,6 +76,13 @@ export type Proposal = {
   content: ProposalContent;
   /** The inputs the proposal was generated from, kept for re-generation. */
   brief: string;
+  /**
+   * The budget agreed with the client before drafting, e.g. "₹25,000" or
+   * "20-25k". Passed to Claude so the price is a real figure instead of a
+   * guess from the house list. Empty when the team left it blank — the
+   * house price applies as before.
+   */
+  budget: string;
   createdAt: string;
   updatedAt: string;
   /**
@@ -116,6 +123,7 @@ type Row = {
   access_code: string;
   content: string;
   brief: string;
+  budget: string | null;
   created_at: string;
   updated_at: string;
   assets: string;
@@ -132,6 +140,8 @@ function toProposal(row: Row): Proposal {
     accessCode: row.access_code,
     content: JSON.parse(row.content) as ProposalContent,
     brief: row.brief,
+    // Rows written before this column existed read back as ''.
+    budget: row.budget ?? '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     acceptedAt: row.accepted_at ?? null,
@@ -169,8 +179,8 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
     .prepare(
       `INSERT INTO proposals
          (slug, client, access_code, content, brief, created_at, updated_at,
-          assets, milestones, stages, accepted_at, assets_shared_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          assets, milestones, stages, accepted_at, assets_shared_at, budget)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(slug) DO UPDATE SET
          client      = excluded.client,
          access_code = excluded.access_code,
@@ -181,7 +191,8 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
          milestones  = excluded.milestones,
          stages      = excluded.stages,
          accepted_at = excluded.accepted_at,
-         assets_shared_at = excluded.assets_shared_at`
+         assets_shared_at = excluded.assets_shared_at,
+         budget      = excluded.budget`
     )
     .run(
       proposal.slug,
@@ -195,7 +206,8 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
       JSON.stringify(proposal.milestones),
       JSON.stringify(proposal.stages),
       proposal.acceptedAt,
-      proposal.assetsSharedAt
+      proposal.assetsSharedAt,
+      proposal.budget
     );
 }
 

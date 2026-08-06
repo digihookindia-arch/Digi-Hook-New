@@ -214,6 +214,13 @@ House pricing — use these figures, do not invent others:
 - Delivery takes 2 to 4 weeks depending on complexity.
 - Every project includes 180 days of free post-launch support, covering bug fixes and minor corrections. An annual maintenance plan (updates, backups, monitoring, priority support) is optional and quoted separately.
 
+If the request below states a budget already agreed with the client, that
+figure is the total — do not substitute the house flat price. Build the
+itemised pricing table to sum to exactly that figure, in the same style
+(scope broken into priced lines), scoping the deliverables to fit it rather
+than second-guessing the number. If no budget is given, price from the
+house figures above as usual.
+
 All figures above exclude GST. Say so on the proposal: mark the total as
 excluding GST, and include a term stating that GST applies on top at the
 prevailing rate.
@@ -319,9 +326,15 @@ async function ask(userMessage: string, schema: object): Promise<
 export async function draftProposal(input: {
   client: string;
   brief: string;
+  /** Budget already agreed with the client, e.g. "₹25,000". Empty to price from the house list. */
+  budget?: string;
 }): Promise<ClaudeResult> {
+  const budgetLine = input.budget?.trim()
+    ? `\n\nBudget agreed with the client: ${input.budget.trim()} (excluding GST). ` +
+      `This is the total — price the proposal to sum to exactly this figure, not the house flat price.`
+    : '';
   const result = await ask(
-    `Write a project proposal for this client.\n\nClient: ${input.client}\n\nBrief from our team:\n${input.brief}`,
+    `Write a project proposal for this client.\n\nClient: ${input.client}\n\nBrief from our team:\n${input.brief}${budgetLine}`,
     PROPOSAL_SCHEMA
   );
   if (!result.ok) return result;

@@ -87,6 +87,7 @@ export async function createProposal(
 
   const client = String(formData.get('client') ?? '').trim();
   const brief = String(formData.get('brief') ?? '').trim();
+  const budget = String(formData.get('budget') ?? '').trim();
 
   if (client.length < 2) return { error: 'Who is this proposal for?' };
   if (brief.length < 20) {
@@ -95,7 +96,7 @@ export async function createProposal(
 
   let result;
   try {
-    result = await draftProposal({ client, brief });
+    result = await draftProposal({ client, brief, budget });
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Could not reach Claude.' };
   }
@@ -108,6 +109,7 @@ export async function createProposal(
     accessCode: newAccessCode(),
     content: result.content,
     brief,
+    budget,
     createdAt: now,
     updatedAt: now,
     // Accepted later — by the client on the page, or the studio after a call.

@@ -11,10 +11,12 @@ import { createProposal, type DraftState } from '../actions';
 export function NewProposalForm({
   defaultClient = '',
   defaultBrief = '',
+  defaultBudget = '',
   enquiryId,
 }: {
   defaultClient?: string;
   defaultBrief?: string;
+  defaultBudget?: string;
   enquiryId?: string;
 }) {
   const [state, action, pending] = useActionState(createProposal, {} as DraftState);
@@ -38,6 +40,28 @@ export function NewProposalForm({
           defaultValue={defaultClient}
           placeholder="Business name"
           className="w-full max-w-[440px] border-2 border-neutral-400 bg-bg p-3.5 text-[15px] leading-none text-text"
+        />
+      </div>
+
+      <div className="mb-6">
+        <label
+          htmlFor="budget"
+          className="mb-2 block text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700"
+        >
+          Budget agreed with the client
+        </label>
+        <p className="m-0 mb-3 max-w-[60ch] text-[13.5px] leading-[1.5] text-neutral-700">
+          If you already settled on a number, put it here — Claude prices the proposal
+          to match it instead of guessing from the standard list. Leave blank to use the
+          standard house price.
+        </p>
+        <input
+          id="budget"
+          name="budget"
+          type="text"
+          defaultValue={defaultBudget}
+          placeholder="e.g. ₹25,000"
+          className="w-full max-w-[280px] border-2 border-neutral-400 bg-bg p-3.5 text-[15px] leading-none text-text"
         />
       </div>
 
