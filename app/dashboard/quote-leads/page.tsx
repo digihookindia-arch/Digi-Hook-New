@@ -128,6 +128,10 @@ export default async function QuoteLeadsPage() {
                         className="whitespace-nowrap font-semibold text-accent-700 underline"
                       >
                         +91 {lead.phone}
+                      </a>{' '}
+                      ·{' '}
+                      <a href={`mailto:${lead.email}`} className="underline">
+                        {lead.email}
                       </a>
                     </div>
                   </div>

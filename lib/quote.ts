@@ -4,6 +4,7 @@ import {
   CONTACT_TIME_QUESTION,
   getQuestions,
 } from '@/content/quote';
+import { isEmail } from '@/lib/enquiry';
 
 /**
  * Pure validation for /get-quote submissions. Mirrors lib/enquiry.ts's rule:
@@ -28,7 +29,7 @@ export type QuoteSource = {
   referrer?: string;
 };
 
-const CONTACT_FIELDS = ['name', 'business', 'phone'] as const;
+const CONTACT_FIELDS = ['name', 'business', 'email', 'phone'] as const;
 const TEXT_ANSWER_MAX_LENGTH = 2000;
 
 function isNonEmpty(value: unknown): value is QuoteAnswerValue {
@@ -116,6 +117,10 @@ export function validateAndPruneQuoteAnswers(
 
   if (!/^\d{10}$/.test(pruned.phone as string)) {
     return { ok: false, error: 'Phone must be exactly 10 digits.' };
+  }
+
+  if (!isEmail(pruned.email as string)) {
+    return { ok: false, error: 'Enter a valid email address.' };
   }
 
   return { ok: true, answers: pruned };

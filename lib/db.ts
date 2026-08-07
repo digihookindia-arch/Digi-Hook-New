@@ -71,9 +71,9 @@ const SCHEMA = `
 
   /*
    * Leads from the /get-quote ad funnel. Separate from enquiries because the
-   * shape differs: no email, budget is either an accepted range or a custom
-   * number, and answers branch per website type. name/business/phone/budget
-   * are promoted into columns so the dashboard lists without parsing JSON;
+   * shape differs: budget is either an accepted range or a custom number, and
+   * answers branch per website type. name/business/email/phone/budget are
+   * promoted into columns so the dashboard lists without parsing JSON;
    * answers holds the full pruned set; source holds UTM/fbclid attribution.
    */
   CREATE TABLE IF NOT EXISTS quote_leads (
@@ -82,6 +82,7 @@ const SCHEMA = `
     website_type  TEXT NOT NULL,
     name          TEXT NOT NULL,
     business      TEXT NOT NULL,
+    email         TEXT NOT NULL DEFAULT '',
     phone         TEXT NOT NULL,
     budget_agreed TEXT NOT NULL,
     budget        TEXT NOT NULL,
@@ -137,6 +138,8 @@ export function getDb(): DatabaseSync {
     // prices against a real figure instead of picking from the house list.
     // Proposals stored before this existed read back as ''.
     addColumnIfMissing(db, 'proposals', 'budget', "TEXT NOT NULL DEFAULT ''");
+    // Added after the /get-quote funnel first shipped without an email field.
+    addColumnIfMissing(db, 'quote_leads', 'email', "TEXT NOT NULL DEFAULT ''");
     global._dhSqlite = db;
   }
   return global._dhSqlite;

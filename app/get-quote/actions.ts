@@ -55,11 +55,14 @@ async function notify(lead: QuoteLead): Promise<void> {
   await sendEmail({
     to: STUDIO_INBOX,
     subject: `New quote lead — ${lead.name} · ${typeLabel}`,
+    // So a reply from the studio reaches the client directly, same as the enquiry notification.
+    replyTo: lead.email,
     body: [
       `${lead.name} (${lead.business}) asked for a quote.`,
       '',
       `Type: ${typeLabel}`,
       `Budget: ${budgetLine(lead)}`,
+      `Email: ${lead.email}`,
       `WhatsApp: +91 ${lead.phone}`,
       `Preferred time: ${lead.contactTime}`,
       '',

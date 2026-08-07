@@ -24,6 +24,7 @@ export type QuoteLead = {
   websiteType: string;
   name: string;
   business: string;
+  email: string;
   phone: string;
   budgetAgreed: string;
   budget: string;
@@ -39,6 +40,7 @@ type Row = {
   website_type: string;
   name: string;
   business: string;
+  email: string;
   phone: string;
   budget_agreed: string;
   budget: string;
@@ -55,6 +57,7 @@ function rowToLead(row: Row): QuoteLead {
     websiteType: row.website_type,
     name: row.name,
     business: row.business,
+    email: row.email ?? '',
     phone: row.phone,
     budgetAgreed: row.budget_agreed,
     budget: row.budget,
@@ -77,6 +80,7 @@ export async function saveQuoteLead(input: {
     websiteType: String(input.answers.websiteType ?? ''),
     name: String(input.answers.name ?? ''),
     business: String(input.answers.business ?? ''),
+    email: String(input.answers.email ?? ''),
     phone: String(input.answers.phone ?? ''),
     budgetAgreed: String(input.answers.budgetAgreed ?? ''),
     budget: String(input.answers.budget ?? ''),
@@ -89,9 +93,9 @@ export async function saveQuoteLead(input: {
   getDb()
     .prepare(
       `INSERT INTO quote_leads
-        (id, created_at, website_type, name, business, phone,
+        (id, created_at, website_type, name, business, email, phone,
          budget_agreed, budget, contact_time, answers, source, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       lead.id,
@@ -99,6 +103,7 @@ export async function saveQuoteLead(input: {
       lead.websiteType,
       lead.name,
       lead.business,
+      lead.email,
       lead.phone,
       lead.budgetAgreed,
       lead.budget,

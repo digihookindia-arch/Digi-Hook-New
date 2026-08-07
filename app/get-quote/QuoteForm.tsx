@@ -26,6 +26,7 @@ import {
   type OptionIcon,
   type QuoteQuestion,
 } from '@/content/quote';
+import { isEmail } from '@/lib/enquiry';
 import { trackPixelCustom, trackPixelEvent } from '@/lib/pixel';
 import type { QuoteAnswers, QuoteSource } from '@/lib/quote';
 import { submitQuoteLead } from './actions';
@@ -36,6 +37,7 @@ const EMPTY_ANSWERS: QuoteAnswers = {
   budget: '',
   name: '',
   business: '',
+  email: '',
   contactTime: '',
   phone: '',
 };
@@ -440,15 +442,17 @@ function BudgetEntryCard({
 function NameBusinessCard({
   name,
   business,
+  email,
   onChange,
   onNext,
 }: {
   name: string;
   business: string;
-  onChange: (field: 'name' | 'business', value: string) => void;
+  email: string;
+  onChange: (field: 'name' | 'business' | 'email', value: string) => void;
   onNext: () => void;
 }) {
-  const valid = name.trim().length > 0 && business.trim().length > 0;
+  const valid = name.trim().length > 0 && business.trim().length > 0 && isEmail(email);
   return (
     <CardShell>
       <CardHeading title="Your name & business name" />
@@ -472,6 +476,17 @@ function NameBusinessCard({
             onChange={(e) => onChange('business', e.target.value)}
             placeholder="e.g. Sharma Traders"
             autoComplete="organization"
+            className="w-full border-2 border-neutral-400 bg-bg px-4 py-3.5 text-[16px] outline-none focus:border-accent-600"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-[14px] font-semibold">Email address</span>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => onChange('email', e.target.value)}
+            placeholder="e.g. rahul@sharmatraders.in"
+            autoComplete="email"
             className="w-full border-2 border-neutral-400 bg-bg px-4 py-3.5 text-[16px] outline-none focus:border-accent-600"
           />
         </label>
@@ -685,6 +700,7 @@ export function QuoteForm() {
         websiteType: id,
         name: prev.name ?? '',
         business: prev.business ?? '',
+        email: prev.email ?? '',
         phone: prev.phone ?? '',
       };
     });
@@ -812,6 +828,7 @@ export function QuoteForm() {
         <NameBusinessCard
           name={answers.name as string}
           business={answers.business as string}
+          email={answers.email as string}
           onChange={(field, v) => setAnswer(field, v)}
           onNext={goForward}
         />
