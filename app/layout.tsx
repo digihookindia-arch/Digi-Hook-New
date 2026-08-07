@@ -34,7 +34,9 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
   },
-  icons: { icon: '/logo.png', apple: '/logo.png' },
+  // No explicit `icons` here — app/icon.svg and app/apple-icon.png (file
+  // convention) are auto-detected and injected. An explicit `icons` field
+  // would suppress that detection.
 };
 
 export default function RootLayout({

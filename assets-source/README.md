@@ -7,6 +7,7 @@ inputs, kept because the shipped versions cannot be reversed back into them.
 |---|---|---|
 | `logo-source.glb` | Tripo3D export of the 3D logo. 759,260 tris, 21.5 MB, with a baked colour texture. | `public/models/logo.glb` (121 KB) via `scripts/optimise-model.mjs` |
 | `proposal-reference-galaxy.pdf` | The client's own Galaxy Super Speciality proposal, 23 July 2026. Fully rasterised — no text layer, read it as images. | The shape of the proposal document: numbered sections, prepared-for/by header, and the feature / what-it-is / why-it-matters annexure tables in `ProposalView`. |
+| `logo-mark-source.svg` | The client's vector "bars" mark (no wordmark), supplied 2026-08-07. Original coordinate space, no background. | `app/icon.svg` (mark centred with padding on a `#f3f2f2` square, 0 border-radius per the flat-design rule) and `app/apple-icon.png` (180×180, rasterised from `app/icon.svg` with a one-off `sharp` install — not a project dependency). Background is `#f3f2f2` rather than transparent so the icon stays visible against both light and dark browser chrome — see the site's own contrast rules for why bare black-on-nothing doesn't survive dark mode. |
 
 ## Why these are here
 
