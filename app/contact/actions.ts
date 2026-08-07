@@ -2,6 +2,7 @@
 
 import { detailQuestions } from '@/content/enquiry';
 import { sendEmail, STUDIO_INBOX } from '@/lib/email';
+import { milestoneEmailHtml, shortReference } from '@/lib/emailTemplate';
 import { saveEnquiry, type Enquiry } from '@/lib/enquiries';
 import { site, SITE_URL } from '@/lib/site';
 import {
@@ -127,13 +128,29 @@ async function notify(enquiry: Enquiry): Promise<void> {
         '',
         'What happens next: we read the brief properly, and send you a written proposal covering scope, the technology we would use and why, a stage-by-stage timeline and the costs. If anything in your brief needs a conversation first, we will call you on the number you gave us.',
         '',
-        'You will hear from us within one working day.',
+        'You will hear from us within 24 hours.',
         '',
         `If you need us sooner, call ${site.phoneDisplay}.`,
         '',
         '— The team at Digi Hook',
         site.addressLine,
       ].join('\n'),
+      html: milestoneEmailHtml({
+        preheader: 'Your enquiry has reached us. A member of the team will reply within 24 hours — no action needed.',
+        kicker: 'Enquiry received',
+        headline: "We'll get back<br>to you within<br>24 hours.",
+        leadHeading: 'Thank you for getting in touch.',
+        leadBody:
+          'Your enquiry has reached us and is with the team. Nothing is needed from you in the meantime — this email is your confirmation.',
+        detailLeftLabel: 'Response time',
+        detailLeftValue: '24 hours',
+        detailRightLabel: 'Reference',
+        detailRightValue: shortReference(enquiry.id),
+        step: 1,
+        ctaText: 'Visit our website',
+        ctaHref: SITE_URL,
+        secondaryLine: `Or write to us directly at <a href="mailto:${site.email}" style="color:#b02510;text-decoration:underline;">${site.email}</a>.`,
+      }),
     }),
 
     sendEmail({
