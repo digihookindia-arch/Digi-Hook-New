@@ -45,11 +45,22 @@ const MAIL_ASSET_ORIGIN = (
   (/^https?:\/\/(localhost|127\.0\.0\.1)/.test(SITE_URL) ? 'https://digihook.in' : SITE_URL)
 ).replace(/\/$/, '');
 
-/** public/logo.png is 1000×238; 150px wide keeps that ratio and stays sharp on retina. */
+/**
+ * Both files are 1000×238, so the widths below keep that ratio and stay sharp
+ * on retina. `light` is the same wordmark in white — the dark original is
+ * invisible on the footer's #201e1d. Regenerate it with
+ * `node scripts/make-logo-light.mjs` whenever public/logo.png changes.
+ */
 const LOGO = {
   src: `${MAIL_ASSET_ORIGIN}/logo.png`,
   width: 150,
   height: 36,
+} as const;
+
+const LOGO_LIGHT = {
+  src: `${MAIL_ASSET_ORIGIN}/logo-light.png`,
+  width: 134,
+  height: 32,
 } as const;
 
 export function escapeHtml(value: string): string {
@@ -259,7 +270,7 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
   <!-- footer -->
   <tr>
     <td class="px" bgcolor="#201e1d" style="background-color:#201e1d;padding:28px 40px 30px 40px;font-family:Arial,Helvetica,sans-serif;">
-      <p style="margin:0 0 6px 0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#f3f2f2;font-weight:bold;">Digi Hook</p>
+      <img src="${LOGO_LIGHT.src}" width="${LOGO_LIGHT.width}" height="${LOGO_LIGHT.height}" alt="Digi Hook" style="display:block;width:${LOGO_LIGHT.width}px;height:${LOGO_LIGHT.height}px;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;margin:0 0 14px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:1.8px;text-transform:uppercase;font-weight:bold;color:#f3f2f2;">
       <p style="margin:0 0 14px 0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;color:#9d9896;">${escapeHtml(site.addressLine)}</p>
       <p style="margin:0 0 14px 0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;color:#9d9896;">
         Call <a href="tel:${site.phoneHref}" style="color:#f3f2f2;text-decoration:underline;">${escapeHtml(site.phoneDisplay)}</a>
