@@ -1,8 +1,8 @@
-import { site, SITE_URL } from './site';
+import { site, SITE_URL, whatsappUrl } from './site';
 
 /**
  * The shared HTML shell for client-facing milestone emails (enquiry received,
- * scheduling call, proposal created, proposal accepted). One table-based
+ * instructions received, proposal created, proposal accepted). One table-based
  * layout, styled to match the site's own design tokens (accent #ec3013, ink
  * #201e1d, flat 2px rules) — built from the client-supplied design in
  * "Enquiry confirmation email.zip". Each milestone calls this with its own
@@ -14,14 +14,43 @@ import { site, SITE_URL } from './site';
  * block full of classes; most clients strip or mis-render both.
  */
 
+/**
+ * Exactly two words per label — the track renders them on two fixed lines
+ * (`label.split(' ')`), so a one- or three-word label breaks the layout.
+ *
+ * Step 2 is the one label that changes with where the client is. Before we
+ * have spoken it is a promise about what happens next ("Call scheduled");
+ * afterwards it is a fact about what already happened ("Instructions
+ * received"). Same step, described from the right side of the call — see
+ * `stepTwoLabel`.
+ */
 const STEP_LABELS = [
   'Enquiry received',
-  'Scheduling call',
+  'Instructions received',
   'Proposal created',
   'Proposal accepted',
 ] as const;
 
 export type MilestoneStep = 1 | 2 | 3 | 4;
+
+/**
+ * Where the masthead logo is fetched from. Deliberately *not* SITE_URL:
+ * that points at localhost in development, and an email sent from a dev box
+ * would arrive with a permanently broken image — the recipient's mail client
+ * has no way to reach your machine. This always addresses the public origin
+ * unless MAIL_ASSET_ORIGIN says otherwise (staging).
+ */
+const MAIL_ASSET_ORIGIN = (
+  process.env.MAIL_ASSET_ORIGIN ??
+  (/^https?:\/\/(localhost|127\.0\.0\.1)/.test(SITE_URL) ? 'https://digihook.in' : SITE_URL)
+).replace(/\/$/, '');
+
+/** public/logo.png is 1000×238; 150px wide keeps that ratio and stays sharp on retina. */
+const LOGO = {
+  src: `${MAIL_ASSET_ORIGIN}/logo.png`,
+  width: 150,
+  height: 36,
+} as const;
 
 export function escapeHtml(value: string): string {
   return value
@@ -45,10 +74,23 @@ export type MilestoneEmailInput = {
   leadBody: string;
   detailLeftLabel: string;
   detailLeftValue: string;
+  /**
+   * Optional — turns the left value into a dark button rather than a big
+   * bold statement. `detailLeftValue` becomes the button's label, so keep it
+   * short ("Open proposal"); a URL pasted here will not wrap and will push
+   * the cell wide.
+   */
+  detailLeftHref?: string;
   detailRightLabel: string;
   detailRightValue: string;
   /** Which of the 4 milestones this email represents — highlights that step in the track. */
   step: MilestoneStep;
+  /**
+   * Overrides the step-2 label in the track. Two words only, same as the
+   * defaults. Used by the enquiry email, which is sent before the call and so
+   * says "Call scheduled" where the later emails say "Instructions received".
+   */
+  stepTwoLabel?: string;
   ctaText: string;
   ctaHref: string;
   /** Rendered under the CTA button. Caller-authored HTML (like `headline`) —
@@ -60,7 +102,24 @@ export type MilestoneEmailInput = {
 export function milestoneEmailHtml(input: MilestoneEmailInput): string {
   const leadBody = escapeHtml(input.leadBody);
 
-  const steps = STEP_LABELS.map((label, i) => {
+  // A linked value becomes a button — a bordered block, not bare underlined
+  // text, so the tap target is obvious on a phone. A plain value stays the
+  // big bold statement the grid was designed around.
+  const leftValue = input.detailLeftHref
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:2px;">
+            <tr>
+              <td bgcolor="#201e1d" style="background-color:#201e1d;">
+                <a href="${input.detailLeftHref}" style="display:block;padding:13px 20px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:16px;mso-line-height-rule:exactly;letter-spacing:1px;text-transform:uppercase;font-weight:bold;color:#ffffff;text-decoration:none;white-space:nowrap;">${escapeHtml(input.detailLeftValue)}&nbsp;&nbsp;&rarr;</a>
+              </td>
+            </tr>
+          </table>`
+    : `<p style="margin:0;font-size:24px;line-height:28px;mso-line-height-rule:exactly;letter-spacing:-0.4px;color:#201e1d;font-weight:bold;">${escapeHtml(input.detailLeftValue)}</p>`;
+
+  const labels = STEP_LABELS.map((label, i) =>
+    i === 1 && input.stepTwoLabel ? input.stepTwoLabel : label
+  );
+
+  const steps = labels.map((label, i) => {
     const n = i + 1;
     const active = n === input.step;
     const barColor = active ? '#ec3013' : '#c9c6c4';
@@ -115,10 +174,7 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr>
         <td valign="middle" style="padding:18px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:18px;mso-line-height-rule:exactly;letter-spacing:2px;text-transform:uppercase;color:#201e1d;font-weight:bold;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-            <td width="14" style="width:14px;height:14px;line-height:14px;font-size:0;background-color:#ec3013;">&nbsp;</td>
-            <td style="padding-left:10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:18px;letter-spacing:2px;text-transform:uppercase;color:#201e1d;font-weight:bold;">Digi Hook</td>
-          </tr></table>
+          <img src="${LOGO.src}" width="${LOGO.width}" height="${LOGO.height}" alt="Digi Hook" style="display:block;width:${LOGO.width}px;height:${LOGO.height}px;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;">
         </td>
         <td valign="middle" align="right" style="padding:18px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;mso-line-height-rule:exactly;letter-spacing:1.5px;text-transform:uppercase;color:#6b6764;">
           ${escapeHtml(input.kicker)}
@@ -157,7 +213,7 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
       <tr>
         <td class="stack" width="50%" valign="top" style="width:50%;padding:24px 40px;border-right:2px solid #201e1d;font-family:Arial,Helvetica,sans-serif;">
           <p style="margin:0 0 8px 0;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#6b6764;font-weight:bold;">${escapeHtml(input.detailLeftLabel)}</p>
-          <p style="margin:0;font-size:24px;line-height:28px;mso-line-height-rule:exactly;letter-spacing:-0.4px;color:#201e1d;font-weight:bold;">${escapeHtml(input.detailLeftValue)}</p>
+          ${leftValue}
         </td>
         <td class="stack stack-last" width="50%" valign="top" style="width:50%;padding:24px 40px;font-family:Arial,Helvetica,sans-serif;">
           <p style="margin:0 0 8px 0;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#6b6764;font-weight:bold;">${escapeHtml(input.detailRightLabel)}</p>
@@ -205,6 +261,11 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
     <td class="px" bgcolor="#201e1d" style="background-color:#201e1d;padding:28px 40px 30px 40px;font-family:Arial,Helvetica,sans-serif;">
       <p style="margin:0 0 6px 0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#f3f2f2;font-weight:bold;">Digi Hook</p>
       <p style="margin:0 0 14px 0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;color:#9d9896;">${escapeHtml(site.addressLine)}</p>
+      <p style="margin:0 0 14px 0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;color:#9d9896;">
+        Call <a href="tel:${site.phoneHref}" style="color:#f3f2f2;text-decoration:underline;">${escapeHtml(site.phoneDisplay)}</a>
+        &nbsp;·&nbsp; WhatsApp <a href="${whatsappUrl('Hello Digi Hook,')}" style="color:#f3f2f2;text-decoration:underline;">${escapeHtml(site.whatsappDisplay)}</a>
+        &nbsp;·&nbsp; ${escapeHtml(site.hoursLine)}
+      </p>
       <p style="margin:0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;color:#9d9896;">
         This message confirms an update on a project enquiry with Digi Hook. No action is needed if this wasn't you — write to
         <a href="mailto:${site.email}" style="color:#f3f2f2;text-decoration:underline;">${site.email}</a>.

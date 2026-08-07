@@ -32,6 +32,15 @@ export const site = {
   email: 'sales@digihook.in',
   phoneDisplay: '+91 98736 74517',
   phoneHref: '+919873674517',
+
+  /**
+   * WhatsApp is a separate line from the office phone above — client-facing
+   * emails point their main call-to-action here, because a reply on WhatsApp
+   * reaches the team faster than an email back. Kept apart deliberately:
+   * changing the office number must not silently repoint the WhatsApp button.
+   */
+  whatsappDisplay: '+91 85957 32020',
+  whatsappHref: '+918595732020',
   address: {
     street: 'A211, Golden I, Noida Extension',
     locality: 'Noida',
@@ -71,3 +80,13 @@ export const site = {
   },
   builtWith: 'Engineered in Next.js, TypeScript and Tailwind CSS.',
 } as const;
+
+/**
+ * A wa.me link that opens WhatsApp with a message already typed. The number
+ * must be digits only — wa.me rejects '+' and spaces, which is why this
+ * strips them rather than trusting the display format above.
+ */
+export function whatsappUrl(message: string): string {
+  const number = site.whatsappHref.replace(/\D/g, '');
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+}
