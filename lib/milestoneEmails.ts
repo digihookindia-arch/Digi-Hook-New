@@ -52,9 +52,11 @@ function signOff(): string[] {
  * client who does not use WhatsApp is never left without a way to reach us.
  */
 function contactLine(): string {
+  // hoursLine is written for the site ("Monday–Saturday, 10:00–19:00 IST") and
+  // is used verbatim — lowercasing it to fit mid-sentence turns IST into "ist".
   return (
-    `Prefer to talk? Call <a href="tel:${site.phoneHref}" style="color:#b02510;text-decoration:underline;">${site.phoneDisplay}</a> ` +
-    `— ${site.hoursLine.toLowerCase()}.`
+    `Prefer to talk? Call <a href="tel:${site.phoneHref}" style="color:#b02510;text-decoration:underline;">${site.phoneDisplay}</a>. ` +
+    `We are here ${site.hoursLine}.`
   );
 }
 
@@ -235,10 +237,16 @@ export function proposalCreatedEmail(input: {
 export function proposalAcceptedEmail(input: {
   name: string;
   slug: string;
-  /** First phase name from the proposal timeline, e.g. "Discovery". */
-  firstPhase: string;
+  /**
+   * First phase name from the proposal timeline, e.g. "Discovery". Optional —
+   * nothing guarantees a drafted proposal has a timeline, and naming a stage
+   * that does not exist is worse than not naming one. When absent the email
+   * simply says work has started.
+   */
+  firstPhase?: string;
 }): MilestoneMail {
   const statusUrl = `${SITE_URL}/proposals/${input.slug}/status`;
+  const phase = input.firstPhase?.trim();
 
   return {
     subject: 'Proposal accepted — we are starting work — Digi Hook',
@@ -247,7 +255,7 @@ export function proposalAcceptedEmail(input: {
       '',
       'Thank you for accepting the proposal. Work begins now.',
       '',
-      `First up is ${input.firstPhase}. We will be in touch shortly about anything we need from you — content, logins, brand files — and we will ask for it in one go rather than in a trickle.`,
+      `${phase ? `First up is ${phase}. ` : ''}We will be in touch shortly about anything we need from you — content, logins, brand files — and we will ask for it in one go rather than in a trickle.`,
       '',
       `You can follow progress against each stage here: ${statusUrl}`,
       '',
@@ -262,8 +270,8 @@ export function proposalAcceptedEmail(input: {
       leadHeading: 'Thank you — we are underway.',
       leadBody:
         'We will be in touch shortly about anything we need from you — content, logins, brand files — asked for in one go rather than in a trickle. In the meantime you can follow progress against each stage on your project page, using the same access code as before.',
-      detailLeftLabel: 'First stage',
-      detailLeftValue: input.firstPhase,
+      detailLeftLabel: phase ? 'First stage' : 'Project',
+      detailLeftValue: phase ?? 'Underway',
       detailRightLabel: 'Status',
       detailRightValue: 'In progress',
       step: 4,

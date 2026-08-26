@@ -83,6 +83,18 @@ export type Proposal = {
    * house price applies as before.
    */
   budget: string;
+  /**
+   * Where this client's proposal-ready and proposal-accepted emails go, and the
+   * number to reach them on. Seeded from the enquiry when the proposal was
+   * drafted from one, entered by hand otherwise. Empty means nothing can be
+   * sent — the dashboard says so rather than failing silently at send time.
+   *
+   * Held on the proposal rather than read back through the enquiry every time:
+   * a client who corrects their address mid-project must not have that change
+   * silently reverted by the original brief.
+   */
+  clientEmail: string;
+  clientPhone: string;
   createdAt: string;
   updatedAt: string;
   /**
@@ -124,6 +136,8 @@ type Row = {
   content: string;
   brief: string;
   budget: string | null;
+  client_email: string | null;
+  client_phone: string | null;
   created_at: string;
   updated_at: string;
   assets: string;
@@ -140,8 +154,10 @@ function toProposal(row: Row): Proposal {
     accessCode: row.access_code,
     content: JSON.parse(row.content) as ProposalContent,
     brief: row.brief,
-    // Rows written before this column existed read back as ''.
+    // Rows written before these columns existed read back as ''.
     budget: row.budget ?? '',
+    clientEmail: row.client_email ?? '',
+    clientPhone: row.client_phone ?? '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     acceptedAt: row.accepted_at ?? null,
@@ -179,8 +195,9 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
     .prepare(
       `INSERT INTO proposals
          (slug, client, access_code, content, brief, created_at, updated_at,
-          assets, milestones, stages, accepted_at, assets_shared_at, budget)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          assets, milestones, stages, accepted_at, assets_shared_at, budget,
+          client_email, client_phone)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(slug) DO UPDATE SET
          client      = excluded.client,
          access_code = excluded.access_code,
@@ -192,7 +209,9 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
          stages      = excluded.stages,
          accepted_at = excluded.accepted_at,
          assets_shared_at = excluded.assets_shared_at,
-         budget      = excluded.budget`
+         budget      = excluded.budget,
+         client_email = excluded.client_email,
+         client_phone = excluded.client_phone`
     )
     .run(
       proposal.slug,
@@ -207,7 +226,9 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
       JSON.stringify(proposal.stages),
       proposal.acceptedAt,
       proposal.assetsSharedAt,
-      proposal.budget
+      proposal.budget,
+      proposal.clientEmail,
+      proposal.clientPhone
     );
 }
 
@@ -223,6 +244,20 @@ export async function setProposalAccepted(
   getDb()
     .prepare('UPDATE proposals SET accepted_at = ? WHERE slug = ?')
     .run(accepted ? new Date().toISOString() : null, slug);
+}
+
+/**
+ * Corrects the client's contact details. Its own narrow write, like the two
+ * above: a proposal revision regenerates `content` from Claude, and must never
+ * be able to overwrite the address a client asked us to use.
+ */
+export async function setProposalContact(
+  slug: string,
+  contact: { email: string; phone: string }
+): Promise<void> {
+  getDb()
+    .prepare('UPDATE proposals SET client_email = ?, client_phone = ? WHERE slug = ?')
+    .run(contact.email.trim(), contact.phone.trim(), slug);
 }
 
 /**

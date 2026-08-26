@@ -16,7 +16,8 @@ import { dirname, resolve } from 'node:path';
 const file = resolve(process.env.SQLITE_PATH ?? 'data/digihook.db');
 
 declare global {
-  // eslint-disable-next-line no-var
+  // `var` is required here — `let`/`const` do not create a property on
+  // globalThis, which is the whole point of this declaration.
   var _dhSqlite: DatabaseSync | undefined;
 }
 
@@ -43,7 +44,9 @@ const SCHEMA = `
     stages      TEXT NOT NULL DEFAULT '[]',
     accepted_at TEXT,
     assets_shared_at TEXT,
-    budget      TEXT NOT NULL DEFAULT ''
+    budget      TEXT NOT NULL DEFAULT '',
+    client_email TEXT NOT NULL DEFAULT '',
+    client_phone TEXT NOT NULL DEFAULT ''
   );
   CREATE INDEX IF NOT EXISTS proposals_created_at ON proposals (created_at DESC);
 
@@ -162,6 +165,32 @@ const SCHEMA = `
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS ticket_messages_ticket ON ticket_messages (ticket_id, created_at);
+
+  /*
+   * Every client-facing milestone email we have tried to send. One row per
+   * attempt, failures included — a send that threw is exactly what the studio
+   * needs to see, and a log that only records successes cannot answer "did
+   * they ever get the proposal link?".
+   *
+   * Rows are keyed by whichever records the email belongs to: stages 1-2 to an
+   * enquiry, stages 3-4 to a proposal, and a proposal drafted from an enquiry
+   * carries both so one query returns the whole history for a client. lead_id
+   * covers the /get-quote funnel, whose leads are their own table.
+   */
+  CREATE TABLE IF NOT EXISTS sent_emails (
+    id            TEXT PRIMARY KEY,
+    sent_at       TEXT NOT NULL,
+    stage         INTEGER NOT NULL,
+    enquiry_id    TEXT,
+    proposal_slug TEXT,
+    lead_id       TEXT,
+    to_address    TEXT NOT NULL,
+    ok            INTEGER NOT NULL,
+    error         TEXT
+  );
+  CREATE INDEX IF NOT EXISTS sent_emails_enquiry ON sent_emails (enquiry_id, stage);
+  CREATE INDEX IF NOT EXISTS sent_emails_proposal ON sent_emails (proposal_slug, stage);
+  CREATE INDEX IF NOT EXISTS sent_emails_lead ON sent_emails (lead_id, stage);
 `;
 
 /**
@@ -209,6 +238,12 @@ export function getDb(): DatabaseSync {
     addColumnIfMissing(db, 'proposals', 'budget', "TEXT NOT NULL DEFAULT ''");
     // Added after the /get-quote funnel first shipped without an email field.
     addColumnIfMissing(db, 'quote_leads', 'email', "TEXT NOT NULL DEFAULT ''");
+    // Where the proposal-ready and proposal-accepted emails go. Seeded from the
+    // enquiry a proposal was drafted from, and typed in by hand otherwise —
+    // proposals that predate this, or that were never linked to an enquiry,
+    // read back as '' and the dashboard asks for an address before sending.
+    addColumnIfMissing(db, 'proposals', 'client_email', "TEXT NOT NULL DEFAULT ''");
+    addColumnIfMissing(db, 'proposals', 'client_phone', "TEXT NOT NULL DEFAULT ''");
     global._dhSqlite = db;
   }
   return global._dhSqlite;

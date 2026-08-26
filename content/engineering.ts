@@ -3,6 +3,20 @@
 
 import type { Faq } from './types';
 
+/**
+ * NEW copy, not from the prototype and not client-approved (2026-08-14).
+ *
+ * The four pillars used to sit directly under the hero, where they read as the
+ * page's opening statement and needed no heading of their own. They now follow
+ * the live-work section — evidence first, explanation second — and a bare band
+ * of four cards mid-page reads as orphaned without one. The pillar copy itself
+ * below is untouched and stays approved.
+ */
+export const pillarsIntro = {
+  kicker: 'The four requirements',
+  title: 'What we engineer for, on every build.',
+} as const;
+
 export const pillars: { num: string; title: string; body: string }[] = [
   {
     "num": "01",

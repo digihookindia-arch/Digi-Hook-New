@@ -3,6 +3,7 @@
 import { detailQuestions } from '@/content/enquiry';
 import { sendEmail, STUDIO_INBOX } from '@/lib/email';
 import { enquiryReceivedEmail } from '@/lib/milestoneEmails';
+import { sendMilestone } from '@/lib/sentEmails';
 import { saveEnquiry, type Enquiry } from '@/lib/enquiries';
 import { SITE_URL } from '@/lib/site';
 import {
@@ -117,10 +118,16 @@ async function notify(enquiry: Enquiry): Promise<void> {
     .join('\n');
 
   await Promise.all([
-    sendEmail({
+    // Through the send log, not sendEmail directly — this is stage 1 of the
+    // same four the dashboard sends by hand, and it belongs in the same
+    // history. Without the row, the panel would show the one email that fires
+    // automatically as never sent.
+    sendMilestone({
+      stage: 1,
       to: enquiry.email,
+      mail: enquiryReceivedEmail({ name: enquiry.name, enquiryId: enquiry.id }),
+      target: { enquiryId: enquiry.id },
       replyTo: STUDIO_INBOX,
-      ...enquiryReceivedEmail({ name: enquiry.name, enquiryId: enquiry.id }),
     }),
 
     sendEmail({

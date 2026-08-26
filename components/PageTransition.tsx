@@ -33,6 +33,11 @@ export function PageTransition({ children }: { children: ReactNode }) {
   // False on the server and on the hydrating render; true from the first
   // effect onwards. Gates the entrance to real navigations only.
   const [navigated, setNavigated] = useState(false);
+  // The one extra render this causes is the point: the flag must be false while
+  // the server markup hydrates and true afterwards, and nothing but an effect
+  // can tell those two moments apart. Deriving it during render would
+  // reintroduce the hydration mismatch this component was written to avoid.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setNavigated(true), []);
 
   const animates = navigated && !reduce;

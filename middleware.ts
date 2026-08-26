@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { CLIENT_COOKIE, SESSION_COOKIE } from '@/lib/auth';
+// Deliberately not '@/lib/auth': that module imports Node's crypto, which the
+// Edge runtime has no answer for. Only the cookie names are needed here.
+import { CLIENT_COOKIE, SESSION_COOKIE } from '@/lib/cookies';
 
 /**
  * Gates on /dashboard (studio) and /portal (clients). These only check that

@@ -46,21 +46,16 @@ const MAIL_ASSET_ORIGIN = (
 ).replace(/\/$/, '');
 
 /**
- * Both files are 1000×238, so the widths below keep that ratio and stay sharp
- * on retina. `light` is the same wordmark in white — the dark original is
- * invisible on the footer's #201e1d. Regenerate it with
- * `node scripts/make-logo-light.mjs` whenever public/logo.png changes.
+ * The masthead wordmark, and the only image in the email. public/logo.png is
+ * 1000×238, so 150px wide keeps that ratio and stays sharp on retina.
+ *
+ * The footer stays a text wordmark on purpose — it sits on #201e1d, which the
+ * dark logo would disappear into, and one logo per email is the point.
  */
 const LOGO = {
   src: `${MAIL_ASSET_ORIGIN}/logo.png`,
   width: 150,
   height: 36,
-} as const;
-
-const LOGO_LIGHT = {
-  src: `${MAIL_ASSET_ORIGIN}/logo-light.png`,
-  width: 134,
-  height: 32,
 } as const;
 
 export function escapeHtml(value: string): string {
@@ -135,7 +130,7 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
               </td>
             </tr>
           </table>`
-    : `<p style="margin:0;font-size:24px;line-height:28px;mso-line-height-rule:exactly;letter-spacing:-0.4px;color:#201e1d;font-weight:bold;">${escapeHtml(input.detailLeftValue)}</p>`;
+    : `<p class="ink" style="margin:0;font-size:24px;line-height:28px;mso-line-height-rule:exactly;letter-spacing:-0.4px;color:#201e1d;font-weight:bold;">${escapeHtml(input.detailLeftValue)}</p>`;
 
   const labels = STEP_LABELS.map((label, i) =>
     i === 1 && input.stepTwoLabel ? input.stepTwoLabel : label
@@ -153,8 +148,8 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
         <td class="step" width="25%" valign="top" style="width:25%;padding:0 10px 0 0;font-family:Arial,Helvetica,sans-serif;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
             <tr><td height="6" style="height:6px;line-height:6px;font-size:0;background-color:${barColor};">&nbsp;</td></tr>
-            <tr><td style="padding-top:12px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.5px;color:${numColor};font-weight:bold;">0${n}</td></tr>
-            <tr><td style="padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:19px;mso-line-height-rule:exactly;color:${textColor};font-weight:${weight};">${line1}<br>${line2}</td></tr>
+            <tr><td class="step-num" style="padding-top:12px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.5px;color:${numColor};font-weight:bold;">0${n}</td></tr>
+            <tr><td class="step-label" style="padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:19px;mso-line-height-rule:exactly;color:${textColor};font-weight:${weight};">${line1}<br>${line2}</td></tr>
           </table>
         </td>`;
   }).join('');
@@ -163,11 +158,11 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
     ? `
   <!-- milestone track -->
   <tr>
-    <td class="px" style="padding:34px 40px 36px 40px;border-bottom:2px solid #201e1d;font-family:Arial,Helvetica,sans-serif;">
+    <td class="px paper" bgcolor="#f3f2f2" style="padding:34px 40px 36px 40px;border-bottom:2px solid #201e1d;font-family:Arial,Helvetica,sans-serif;background-color:#f3f2f2;">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
       <tr>
-        <td valign="middle" style="padding-bottom:22px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#6b6764;font-weight:bold;">How this moves forward</td>
-        <td valign="middle" align="right" style="padding-bottom:22px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#ec3013;font-weight:bold;">Step ${input.step} of 4</td>
+        <td class="track-head ink-mute" valign="middle" style="padding:0 14px 22px 0;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#6b6764;font-weight:bold;">How this moves forward</td>
+        <td class="track-head track-head-count" valign="middle" align="right" style="padding-bottom:22px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#ec3013;font-weight:bold;white-space:nowrap;">Step ${input.step} of 4</td>
       </tr>
       </table>
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
@@ -187,39 +182,94 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
-<meta name="supported-color-schemes" content="light dark">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
 <title>${escapeHtml(input.kicker)}</title>
 <!--[if mso]>
 <style>body,table,td,a{font-family:Arial,Helvetica,sans-serif !important;}</style>
 <![endif]-->
 <style>
+  /*
+   * Stay light everywhere.
+   *
+   * The template previously advertised "light dark", which tells a client the
+   * design handles dark mode — so Gmail felt free to invert it, and did:
+   * the paper-white panel went charcoal, the dark logo vanished into it, and
+   * the white headline on the red block flipped to near-black. Declaring
+   * "light only" is the supported way to decline that.
+   *
+   * Gmail and Outlook do not all honour the declaration, so the rules below
+   * restate the colours through the hooks those clients expose:
+   * [data-ogsc]/[data-ogsb] are rewritten onto elements by Outlook.com's dark
+   * mode, and the media queries catch clients that force a scheme anyway.
+   * Belt and braces on purpose — a half-inverted email is worse than either.
+   */
+  :root { color-scheme: light only; supported-color-schemes: light only; }
+
+  u + .body .force-light,
+  [data-ogsc] .force-light { background-color:#f3f2f2 !important; }
+  [data-ogsc] .ink, [data-ogsb] .ink { color:#201e1d !important; }
+  [data-ogsc] .ink-soft, [data-ogsb] .ink-soft { color:#3d3a38 !important; }
+  [data-ogsc] .ink-mute, [data-ogsb] .ink-mute { color:#6b6764 !important; }
+  [data-ogsc] .on-accent, [data-ogsb] .on-accent { color:#ffffff !important; }
+  [data-ogsc] .accent-bg, [data-ogsb] .accent-bg { background-color:#ec3013 !important; }
+  [data-ogsc] .paper, [data-ogsb] .paper { background-color:#f3f2f2 !important; }
+  [data-ogsc] .shell, [data-ogsb] .shell { background-color:#dedcdb !important; }
+
+  @media (prefers-color-scheme: dark) {
+    .paper { background-color:#f3f2f2 !important; }
+    .shell { background-color:#dedcdb !important; }
+    .accent-bg { background-color:#ec3013 !important; }
+    .ink { color:#201e1d !important; }
+    .ink-soft { color:#3d3a38 !important; }
+    .ink-mute { color:#6b6764 !important; }
+    .on-accent { color:#ffffff !important; }
+  }
+
   @media only screen and (max-width:620px){
     .px{padding-left:24px !important;padding-right:24px !important;}
     .h1{font-size:32px !important;line-height:34px !important;}
     .poster{font-size:26px !important;line-height:30px !important;}
     .stack{display:block !important;width:100% !important;border-right:0 !important;border-bottom:2px solid #201e1d !important;}
     .stack-last{border-bottom:0 !important;}
-    .step{display:block !important;width:100% !important;padding:0 0 16px 0 !important;}
+    /*
+     * The track stays four across on a phone. Stacking it — which this used to
+     * do — turned a progress indicator into a 900px list where each 6px bar
+     * read as an orphaned dash, and you could no longer see at a glance that
+     * step 1 of 4 was done. Four narrow columns still read as a progress bar,
+     * which is the entire point of the component.
+     *
+     * The labels sit at 12px — 11px was legible only in the sense that it fit.
+     * The binding constraint is "Instructions", the longest unbreakable string
+     * any label contains; it is why the gutter between columns is 4px rather
+     * than the 6px the desktop layout uses.
+     */
+    .step{display:table-cell !important;width:25% !important;padding:0 4px 0 0 !important;}
+    .step-num{font-size:11px !important;letter-spacing:1px !important;}
+    .step-label{font-size:12px !important;line-height:15px !important;letter-spacing:-0.35px !important;}
+    /* Two cells in one row collided on narrow screens, printing
+       "HOW THIS MOVES FORWARDSTEP 1 OF 4". Stacked, they cannot touch. */
+    .track-head{display:block !important;width:100% !important;text-align:left !important;padding-bottom:4px !important;}
+    .track-head-count{padding-bottom:18px !important;}
   }
 </style>
 </head>
-<body style="margin:0;padding:0;background-color:#dedcdb;">
+<body class="body shell" bgcolor="#dedcdb" style="margin:0;padding:0;background-color:#dedcdb;">
 <span style="display:none;font-size:1px;color:#dedcdb;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${escapeHtml(input.preheader)}</span>
 
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#dedcdb;">
+<table role="presentation" class="shell" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#dedcdb" style="background-color:#dedcdb;">
 <tr>
-<td align="center" style="padding:36px 12px;">
+<td align="center" bgcolor="#dedcdb" style="padding:36px 12px;background-color:#dedcdb;">
 
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:600px;background-color:#f3f2f2;border:2px solid #201e1d;">
+<table role="presentation" class="paper force-light" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#f3f2f2" style="width:100%;max-width:600px;background-color:#f3f2f2;border:2px solid #201e1d;">
 
   <!-- masthead -->
   <tr>
-    <td class="px" style="padding:0 40px;border-bottom:2px solid #201e1d;">
+    <td class="px paper" bgcolor="#f3f2f2" style="padding:0 40px;border-bottom:2px solid #201e1d;background-color:#f3f2f2;">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr>
         <td valign="middle" style="padding:18px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:18px;mso-line-height-rule:exactly;letter-spacing:2px;text-transform:uppercase;color:#201e1d;font-weight:bold;">
-          <img src="${LOGO.src}" width="${LOGO.width}" height="${LOGO.height}" alt="Digi Hook" style="display:block;width:${LOGO.width}px;height:${LOGO.height}px;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;">
+          <img src="${LOGO.src}" width="${LOGO.width}" height="${LOGO.height}" alt="Digi Hook" style="display:block;width:${LOGO.width}px;height:${LOGO.height}px;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;background-color:#f3f2f2;">
         </td>
         <td valign="middle" align="right" style="padding:18px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;mso-line-height-rule:exactly;letter-spacing:1.5px;text-transform:uppercase;color:#6b6764;">
           ${escapeHtml(input.kicker)}
@@ -231,9 +281,9 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
 
   <!-- accent poster statement -->
   <tr>
-    <td class="px" bgcolor="#ec3013" style="background-color:#ec3013;padding:46px 40px 44px 40px;border-bottom:2px solid #201e1d;">
-      <p style="margin:0 0 22px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;font-weight:bold;">${escapeHtml(input.kicker)}</p>
-      <p class="poster" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:40px;line-height:44px;mso-line-height-rule:exactly;letter-spacing:-1.2px;color:#ffffff;font-weight:bold;">
+    <td class="px accent-bg" bgcolor="#ec3013" style="background-color:#ec3013;padding:46px 40px 44px 40px;border-bottom:2px solid #201e1d;">
+      <p class="on-accent" style="margin:0 0 22px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;font-weight:bold;">${escapeHtml(input.kicker)}</p>
+      <p class="poster on-accent" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:40px;line-height:44px;mso-line-height-rule:exactly;letter-spacing:-1.2px;color:#ffffff;font-weight:bold;">
         ${input.headline}
       </p>
     </td>
@@ -241,11 +291,11 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
 
   <!-- lede -->
   <tr>
-    <td class="px" style="padding:36px 40px 34px 40px;border-bottom:2px solid #201e1d;">
-      <h1 class="h1" style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:26px;line-height:32px;mso-line-height-rule:exactly;letter-spacing:-0.5px;color:#201e1d;font-weight:bold;">
+    <td class="px paper" bgcolor="#f3f2f2" style="padding:36px 40px 34px 40px;border-bottom:2px solid #201e1d;background-color:#f3f2f2;">
+      <h1 class="h1 ink" style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:26px;line-height:32px;mso-line-height-rule:exactly;letter-spacing:-0.5px;color:#201e1d;font-weight:bold;">
         ${escapeHtml(input.leadHeading)}
       </h1>
-      <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:27px;mso-line-height-rule:exactly;color:#3d3a38;">
+      <p class="ink-soft" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:27px;mso-line-height-rule:exactly;color:#3d3a38;">
         ${leadBody}
       </p>
     </td>
@@ -253,16 +303,16 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
 
   <!-- detail grid -->
   <tr>
-    <td style="padding:0;border-bottom:2px solid #201e1d;">
+    <td class="paper" bgcolor="#f3f2f2" style="padding:0;border-bottom:2px solid #201e1d;background-color:#f3f2f2;">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
       <tr>
-        <td class="stack" width="50%" valign="top" style="width:50%;padding:24px 40px;border-right:2px solid #201e1d;font-family:Arial,Helvetica,sans-serif;">
-          <p style="margin:0 0 8px 0;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#6b6764;font-weight:bold;">${escapeHtml(input.detailLeftLabel)}</p>
+        <td class="stack paper" width="50%" valign="top" bgcolor="#f3f2f2" style="width:50%;padding:24px 40px;border-right:2px solid #201e1d;font-family:Arial,Helvetica,sans-serif;background-color:#f3f2f2;">
+          <p class="ink-mute" style="margin:0 0 8px 0;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#6b6764;font-weight:bold;">${escapeHtml(input.detailLeftLabel)}</p>
           ${leftValue}
         </td>
-        <td class="stack stack-last" width="50%" valign="top" style="width:50%;padding:24px 40px;font-family:Arial,Helvetica,sans-serif;">
-          <p style="margin:0 0 8px 0;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#6b6764;font-weight:bold;">${escapeHtml(input.detailRightLabel)}</p>
-          <p style="margin:0;font-size:24px;line-height:28px;mso-line-height-rule:exactly;letter-spacing:-0.4px;color:#201e1d;font-weight:bold;">${escapeHtml(input.detailRightValue)}</p>
+        <td class="stack stack-last paper" width="50%" valign="top" bgcolor="#f3f2f2" style="width:50%;padding:24px 40px;font-family:Arial,Helvetica,sans-serif;background-color:#f3f2f2;">
+          <p class="ink-mute" style="margin:0 0 8px 0;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#6b6764;font-weight:bold;">${escapeHtml(input.detailRightLabel)}</p>
+          <p class="ink" style="margin:0;font-size:24px;line-height:28px;mso-line-height-rule:exactly;letter-spacing:-0.4px;color:#201e1d;font-weight:bold;">${escapeHtml(input.detailRightValue)}</p>
         </td>
       </tr>
       </table>
@@ -273,7 +323,7 @@ ${track}
 
   <!-- action -->
   <tr>
-    <td class="px" style="padding:32px 40px 34px 40px;border-bottom:2px solid #201e1d;">
+    <td class="px paper" bgcolor="#f3f2f2" style="padding:32px 40px 34px 40px;border-bottom:2px solid #201e1d;background-color:#f3f2f2;">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
         <tr>
           <td bgcolor="#ec3013" style="background-color:#ec3013;border-radius:0;padding:0;">
@@ -290,7 +340,7 @@ ${track}
   <!-- footer -->
   <tr>
     <td class="px" bgcolor="#201e1d" style="background-color:#201e1d;padding:28px 40px 30px 40px;font-family:Arial,Helvetica,sans-serif;">
-      <img src="${LOGO_LIGHT.src}" width="${LOGO_LIGHT.width}" height="${LOGO_LIGHT.height}" alt="Digi Hook" style="display:block;width:${LOGO_LIGHT.width}px;height:${LOGO_LIGHT.height}px;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;margin:0 0 14px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:1.8px;text-transform:uppercase;font-weight:bold;color:#f3f2f2;">
+      <p style="margin:0 0 6px 0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#f3f2f2;font-weight:bold;">Digi Hook</p>
       <p style="margin:0 0 14px 0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;color:#9d9896;">${escapeHtml(site.addressLine)}</p>
       <p style="margin:0 0 14px 0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;color:#9d9896;">
         Call <a href="tel:${site.phoneHref}" style="color:#f3f2f2;text-decoration:underline;">${escapeHtml(site.phoneDisplay)}</a>

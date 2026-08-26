@@ -127,6 +127,20 @@ export async function getEnquiry(id: string): Promise<Enquiry | null> {
   return row ? toEnquiry(row) : null;
 }
 
+/**
+ * The enquiry a proposal was drafted from, if there was one. Most proposals
+ * are typed straight into the dashboard and have no enquiry behind them, so
+ * null is the normal case rather than an error.
+ */
+export async function getEnquiryByProposalSlug(
+  slug: string
+): Promise<Enquiry | null> {
+  const row = getDb()
+    .prepare('SELECT * FROM enquiries WHERE proposal_slug = ? LIMIT 1')
+    .get(slug) as Row | undefined;
+  return row ? toEnquiry(row) : null;
+}
+
 export async function setEnquiryStatus(
   id: string,
   status: EnquiryStatus

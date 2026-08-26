@@ -1,15 +1,22 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Trash2, ExternalLink } from 'lucide-react';
-import { getProposal } from '@/lib/proposals';
+import { ArrowLeft, ChevronRight, Trash2, ExternalLink } from 'lucide-react';
+import { getProposalJourney } from '@/lib/journey';
+import { isEmailConfigured } from '@/lib/email';
 import { ProposalView } from '@/components/ProposalView';
+import { ClientUpdates } from '@/components/ClientUpdates';
 import {
   requireSession,
   removeProposal,
   setAcceptedAction,
   setAssetsSharedAction,
 } from '../actions';
+import {
+  sendMilestoneAction,
+  updateProposalContactAction,
+} from '../enquiries/actions';
 import { ReviseForm } from './ReviseForm';
+import { ProposalContentEditor } from './ProposalContentEditor';
 import { DeliveryEditor } from './DeliveryEditor';
 
 export const dynamic = 'force-dynamic';
@@ -22,8 +29,9 @@ export default async function EditProposalPage({
   await requireSession();
   const { slug } = await params;
 
-  const proposal = await getProposal(slug);
-  if (!proposal) notFound();
+  const journey = await getProposalJourney(slug);
+  if (!journey?.proposal) notFound();
+  const { proposal } = journey;
 
   return (
     <main>
@@ -151,9 +159,88 @@ export default async function EditProposalPage({
           </p>
         </div>
 
+        {/* Who the client is, and what they have been told. The contact form
+            comes first: without an address nothing below can send. */}
+        <div className="mb-6 border-2 border-text p-6">
+          <h2 className="m-0 mb-1.5 font-heading text-[18px] font-bold leading-[1.2] tracking-[-0.02em]">
+            Client contact
+          </h2>
+          <p className="m-0 mb-4 text-[13.5px] leading-[1.55] text-neutral-700">
+            {journey.enquiry
+              ? 'Taken from the enquiry this was drafted from. Correct it here if the client has asked us to use a different address.'
+              : 'This proposal was created directly, so nothing has captured the client’s details yet. Add them to send updates.'}
+          </p>
+          <form
+            action={updateProposalContactAction}
+            className="flex flex-wrap items-end gap-3"
+          >
+            <input type="hidden" name="slug" value={proposal.slug} />
+            <label className="block flex-[1_1_240px]">
+              <span className="mb-2 block text-[11px] font-semibold uppercase leading-none tracking-[0.12em] text-neutral-700">
+                Email
+              </span>
+              <input
+                type="email"
+                name="email"
+                defaultValue={proposal.clientEmail}
+                placeholder="name@company.in"
+                className="w-full border-2 border-neutral-400 bg-bg px-3.5 py-3 text-[14.5px] leading-none text-text"
+              />
+            </label>
+            <label className="block flex-[1_1_180px]">
+              <span className="mb-2 block text-[11px] font-semibold uppercase leading-none tracking-[0.12em] text-neutral-700">
+                Phone / WhatsApp
+              </span>
+              <input
+                type="tel"
+                name="phone"
+                defaultValue={proposal.clientPhone}
+                placeholder="98765 43210"
+                className="w-full border-2 border-neutral-400 bg-bg px-3.5 py-3 text-[14.5px] leading-none text-text"
+              />
+            </label>
+            <button
+              type="submit"
+              className="border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
+            >
+              Save
+            </button>
+          </form>
+        </div>
+
+        <ClientUpdates
+          target={{ slug: proposal.slug }}
+          rows={journey.rows}
+          action={sendMilestoneAction}
+          emailConfigured={isEmailConfigured()}
+        />
+
         <div className="mb-10">
           <ReviseForm slug={proposal.slug} />
         </div>
+
+        {/* Manual, no-AI alternative to Revise above — for the payment split
+            Claude structurally cannot state, and for edits faster to type than
+            to describe. Collapsed by default: most changes go through Revise,
+            and this form is the entire document at once. */}
+        <details className="group mb-10 border-2 border-text">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-text px-[18px] py-3.5 text-[11.5px] font-semibold uppercase leading-[1.3] tracking-[0.14em] text-bg [&::-webkit-details-marker]:hidden">
+            Edit the document directly
+            <ChevronRight
+              size={15}
+              strokeWidth={2.5}
+              aria-hidden="true"
+              className="shrink-0 transition-transform group-open:rotate-90"
+            />
+          </summary>
+          <div className="p-[18px]">
+            <p className="m-0 mb-6 max-w-[60ch] text-[13.5px] leading-[1.55] text-neutral-700">
+              Every field of the document, typed by hand — no AI. Use this for the
+              payment split, or anything faster to type than to describe above.
+            </p>
+            <ProposalContentEditor slug={proposal.slug} initialContent={proposal.content} />
+          </div>
+        </details>
 
         {/* Studio-kept records behind the client's other two tabs. Claude never
             writes these, and revising the proposal above leaves them alone. */}

@@ -29,7 +29,12 @@ export const site = {
   url: SITE_URL,
   // The one published address. Feeds the contact page, the footer and the
   // `email` field in the Organization / LocalBusiness JSON-LD.
-  email: 'sales@digihook.in',
+  // Changed from sales@ on 2026-08-08: that address does not authenticate
+  // against the mail server, while this one does — so it was published on the
+  // contact page, in the footer, in the JSON-LD and at the foot of every client
+  // email while quite possibly bouncing anything sent to it. If sales@ is later
+  // created as a real mailbox, this can go back.
+  email: 'contact@digihook.in',
   phoneDisplay: '+91 98736 74517',
   phoneHref: '+919873674517',
 

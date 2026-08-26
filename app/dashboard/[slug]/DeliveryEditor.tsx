@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { Plus, X, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import {
   ASSET_LABELS,
   ASSET_STATUSES,
@@ -9,13 +9,16 @@ import {
   MILESTONE_STATUSES,
   STAGE_LABELS,
   STAGE_STATUSES,
-  milestoneAmounts,
+  formatInr,
+  milestoneAmountValues,
+  parseAmount,
   totalPercent,
   type AssetItem,
   type Milestone,
   type WorkStage,
 } from '@/lib/delivery';
 import { saveDeliveryAction, type DeliveryState } from '../actions';
+import { Label, Panel, RowShell, inputClass } from './EditorKit';
 
 /**
  * Studio-side editing for the client's /assets and /status tabs.
@@ -24,77 +27,6 @@ import { saveDeliveryAction, type DeliveryState } from '../actions';
  * the server re-validates row by row — the shapes here are a convenience for
  * whoever is typing, never the thing that is trusted.
  */
-
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="mb-1.5 block text-[11px] font-semibold uppercase leading-none tracking-[0.12em] text-neutral-700">
-      {children}
-    </span>
-  );
-}
-
-const inputClass =
-  'w-full border-2 border-neutral-400 bg-bg p-2.5 text-[14px] leading-[1.4] text-text';
-
-function RowShell({
-  children,
-  onRemove,
-  removeLabel,
-}: {
-  children: React.ReactNode;
-  onRemove: () => void;
-  removeLabel: string;
-}) {
-  return (
-    <div className="relative border-b border-neutral-300 p-[18px] pr-[58px]">
-      {children}
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={removeLabel}
-        className="absolute right-[14px] top-[14px] inline-flex h-6 w-6 items-center justify-center border-2 border-neutral-400 text-neutral-700 transition-colors hover:border-accent-700 hover:text-accent-700"
-      >
-        <X size={13} strokeWidth={3} aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-
-function Panel({
-  title,
-  hint,
-  onAdd,
-  addLabel,
-  children,
-}: {
-  title: string;
-  hint: string;
-  onAdd: () => void;
-  addLabel: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mb-7 border-2 border-text">
-      <div className="bg-text px-[18px] py-3.5 text-[11.5px] font-semibold uppercase leading-[1.3] tracking-[0.14em] text-bg">
-        {title}
-      </div>
-      <p className="m-0 border-b border-neutral-300 p-[18px] text-[13.5px] leading-[1.55] text-neutral-700">
-        {hint}
-      </p>
-      {children}
-      <div className="p-[18px]">
-        <button
-          type="button"
-          onClick={onAdd}
-          className="inline-flex min-h-[44px] items-center gap-2 border-2 border-text px-4 text-[13.5px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
-        >
-          <Plus size={14} strokeWidth={3} aria-hidden="true" />
-          {addLabel}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export function DeliveryEditor({
   slug,
@@ -137,7 +69,14 @@ export function DeliveryEditor({
   }
 
   const claimed = totalPercent(milestones);
-  const amounts = milestoneAmounts(total, milestones);
+  const totalValue = parseAmount(total);
+  const amountValues = milestoneAmountValues(total, milestones);
+  const amounts = amountValues.map((n) => (n === null ? null : formatInr(n)));
+  // When the total is a real figure, the honest check is on rupees, not
+  // percents — an exact amount typed into one row shifts what the others must
+  // add up to. Percent-mode rows with no figure count as 0 here on purpose.
+  const amountSum = amountValues.reduce((sum: number, n) => sum + (n ?? 0), 0);
+  const pureShares = milestones.every((m) => m.amount === null);
 
   return (
     <form action={action}>
@@ -266,12 +205,12 @@ export function DeliveryEditor({
 
       <Panel
         title="Payment schedule"
-        hint="Starts at the standard 20 / 30 / 50 split. Amounts are worked out from the proposal total, so edit the percentages, not the rupees."
+        hint="Starts at the standard 20 / 30 / 50 split, with amounts worked out from the proposal total. Edit the share to keep that, or type an exact amount to fix a rupee figure for a payment — the last one you touched wins for that row."
         addLabel="Add a payment"
         onAdd={() =>
           setMilestones((rows) => [
             ...rows,
-            { label: '', percent: 0, status: 'pending', note: '' },
+            { label: '', percent: 0, status: 'pending', note: '', amount: null },
           ])
         }
       >
@@ -302,14 +241,57 @@ export function DeliveryEditor({
                     className={inputClass}
                     value={milestone.percent}
                     onChange={(e) =>
+                      // Editing the share puts the row back in derived mode —
+                      // a stale rupee override would silently win otherwise.
                       patch(setMilestones, i, {
                         percent: Number(e.target.value),
+                        amount: null,
                       })
                     }
                   />
                   <span className="inline-flex items-center text-[14px] font-semibold leading-none text-neutral-700">
                     %
                   </span>
+                </div>
+              </label>
+              <label className="block">
+                <Label>Exact amount</Label>
+                <div className="flex items-stretch gap-2">
+                  <span className="inline-flex items-center text-[14px] font-semibold leading-none text-neutral-700">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    className={inputClass}
+                    value={milestone.amount ?? ''}
+                    placeholder={
+                      amountValues[i] === null ? 'e.g. 5000' : String(amountValues[i])
+                    }
+                    onChange={(e) => {
+                      const raw = e.target.value.trim();
+                      if (raw === '') {
+                        patch(setMilestones, i, { amount: null });
+                        return;
+                      }
+                      const amount = Math.max(0, Math.round(Number(raw) || 0));
+                      // Keep the stored share in step with the typed figure so
+                      // the "N%" the client reads beside it stays truthful.
+                      // With a range total there is no figure to divide by, so
+                      // the share is left alone.
+                      patch(setMilestones, i, {
+                        amount,
+                        ...(totalValue !== null && totalValue > 0
+                          ? {
+                              percent: Math.min(
+                                100,
+                                Math.max(0, Math.round((amount / totalValue) * 100))
+                              ),
+                            }
+                          : {}),
+                      });
+                    }}
+                  />
                 </div>
               </label>
               <label className="block">
@@ -341,19 +323,32 @@ export function DeliveryEditor({
             </label>
             <div className="mt-3 text-[13px] leading-[1.5] text-neutral-700">
               {amounts[i]
-                ? `Client sees ${amounts[i]}, excluding GST.`
-                : `The proposal total (${total}) is not a single figure, so the client sees the percentage only.`}
+                ? `Client sees ${amounts[i]}${milestone.amount !== null ? ' — a fixed figure; the share follows it' : ''}, excluding GST.`
+                : `The proposal total (${total}) is not a single figure, so the client sees the percentage only. Type an exact amount to show rupees.`}
             </div>
           </RowShell>
         ))}
 
-        {milestones.length > 0 && claimed !== 100 ? (
+        {/* With a real total the honest check is on rupees — mixing an exact
+            figure into a percent split shifts what the rest must add up to.
+            Only a pure percent split with no figure to check falls back to
+            the percentage test. */}
+        {milestones.length > 0 && totalValue !== null && amountSum !== totalValue ? (
+          <p
+            role="status"
+            className="m-0 border-b border-neutral-300 bg-neutral-100 p-[18px] text-[13.5px] font-medium leading-[1.55] text-accent-700"
+          >
+            The payments add up to {formatInr(amountSum)}, not the{' '}
+            {formatInr(totalValue)} total. The client will see a schedule that does
+            not sum to the project price.
+          </p>
+        ) : milestones.length > 0 && totalValue === null && pureShares && claimed !== 100 ? (
           <p
             role="status"
             className="m-0 border-b border-neutral-300 bg-neutral-100 p-[18px] text-[13.5px] font-medium leading-[1.55] text-accent-700"
           >
             The percentages add up to {claimed}%, not 100%. The client will see
-            amounts that do not sum to the project total.
+            shares that do not cover the whole project.
           </p>
         ) : null}
       </Panel>

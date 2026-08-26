@@ -36,7 +36,16 @@ const split = (percents: number[]): Milestone[] =>
     percent,
     status: 'pending',
     note: '',
+    amount: null,
   }));
+
+/** A split with an exact rupee figure fixed on one row. */
+const withAmount = (
+  milestones: Milestone[],
+  index: number,
+  amount: number
+): Milestone[] =>
+  milestones.map((m, i) => (i === index ? { ...m, amount } : m));
 
 console.log('\n— a posted payload cannot smuggle values past the schema —');
 
@@ -95,6 +104,26 @@ check('rounding drift lands on the last row so the parts sum to the total exactl
 check('percentages short of 100 are left alone rather than fudged up to the total',
   JSON.stringify(milestoneAmounts('₹30,000', split([20]))) === JSON.stringify(['₹6,000']));
 check('totalPercent adds the split up', totalPercent(split([20, 30, 50])) === 100);
+
+console.log('\n— exact rupee overrides —');
+
+check('a fixed amount wins over the percent-derived figure',
+  milestoneAmounts('₹30,000', withAmount(split([20, 30, 50]), 0, 7000))[0] === '₹7,000');
+check('rows without an override still derive from the total beside a fixed one',
+  milestoneAmounts('₹30,000', withAmount(split([20, 30, 50]), 0, 7000))[1] === '₹9,000');
+check('a fixed amount shows a figure even when the total is a range',
+  milestoneAmounts('₹5,000 – ₹10,000', withAmount(split([0]), 0, 7500))[0] === '₹7,500');
+check('drift correction stays out of a schedule with a hand-set figure',
+  JSON.stringify(milestoneAmounts('₹1,00,001', withAmount(split([33, 33, 34]), 0, 33000))) ===
+    JSON.stringify(['₹33,000', '₹33,000', '₹34,000']));
+check('rows stored before the amount column read back as derive-from-total',
+  parseMilestones([{ label: 'Advance', percent: 20, status: 'pending', note: '' }])[0]?.amount === null);
+check('a posted amount survives the parse, rounded to whole rupees',
+  parseMilestones([{ label: 'X', percent: 0, status: 'pending', note: '', amount: 4999.6 }])[0]?.amount === 5000);
+check('a negative posted amount is dropped, not clamped to a figure',
+  parseMilestones([{ label: 'X', percent: 0, status: 'pending', note: '', amount: -500 }])[0]?.amount === null);
+check('a garbage posted amount is dropped',
+  parseMilestones([{ label: 'X', percent: 0, status: 'pending', note: '', amount: 'lots' }])[0]?.amount === null);
 
 console.log('\n— stages seed from the proposal timeline —');
 

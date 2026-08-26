@@ -45,16 +45,16 @@ export function Header() {
 
                 Height is fluid rather than fixed: the header row already
                 overflows its own width below roughly 560px, so growing the
-                logo there would push the CTA further off-screen. This holds
-                36px down to a 720px viewport and returns to the previous 26px
-                on phones. */}
+                logo there would push the CTA further off-screen. Each stop is
+                25% up on the previous 26/5vw/36 — 45px on desktop, holding to
+                a 720px viewport, easing back to 33px on phones. */}
             <Image
               src="/logo.png"
               alt="Digi Hook"
               width={151}
               height={36}
               priority
-              className="h-[clamp(26px,5vw,36px)] w-auto mix-blend-multiply"
+              className="h-[clamp(33px,6.25vw,45px)] w-auto mix-blend-multiply"
             />
           </Link>
 

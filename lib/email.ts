@@ -20,10 +20,10 @@ const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 
 /** Verified sender. Must be the same mailbox as SMTP_USER — Hostinger rejects a mismatched From. */
-const FROM = process.env.MAIL_FROM ?? `${site.name} <sales@digihook.in>`;
+const FROM = process.env.MAIL_FROM ?? `${site.name} <${site.email}>`;
 
 /** Where new-enquiry notifications land. */
-export const STUDIO_INBOX = process.env.STUDIO_INBOX ?? 'sales@digihook.in';
+export const STUDIO_INBOX = process.env.STUDIO_INBOX ?? site.email;
 
 export type Mail = {
   to: string;

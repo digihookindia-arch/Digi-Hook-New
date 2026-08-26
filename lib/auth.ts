@@ -1,4 +1,10 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
+import {
+  CLIENT_COOKIE,
+  CLIENT_SESSION_MAX_AGE,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE,
+} from './cookies';
 
 /**
  * Dashboard auth: one shared team password, exchanged for a signed session
@@ -6,8 +12,11 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
  * `expiry.signature`, verified with an HMAC the browser cannot forge.
  */
 
-export const SESSION_COOKIE = 'dh_dash';
-export const SESSION_MAX_AGE = 60 * 60 * 12; // 12 hours
+// Defined in ./cookies so the middleware can read the name without dragging
+// this module — and Node's crypto — into the Edge runtime. Imported rather
+// than re-exported blind, because `createSessionToken` below uses the max age;
+// the re-export keeps every existing import of this module working.
+export { SESSION_COOKIE, SESSION_MAX_AGE };
 
 function secret(): string {
   const value = process.env.AUTH_SECRET;
@@ -75,8 +84,10 @@ export function verifyAccessToken(
 
 /* ── client portal accounts ─────────────────────────────────────────────── */
 
-export const CLIENT_COOKIE = 'dh_client';
-export const CLIENT_SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+// Like the dashboard pair above: named in ./cookies so the middleware can
+// check presence without dragging crypto into the Edge runtime; re-exported
+// here so callers keep one import site.
+export { CLIENT_COOKIE, CLIENT_SESSION_MAX_AGE };
 
 /**
  * Password hashing via scrypt from node:crypto — no dependency to install.
