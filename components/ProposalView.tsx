@@ -257,9 +257,13 @@ export function ProposalView({
                       {amounts[i]}
                     </div>
                   ) : null}
-                  <div className="mt-1 text-[12.5px] font-semibold uppercase leading-none tracking-[0.08em] text-neutral-700">
-                    {m.percent}%
-                  </div>
+                  {/* A rupee figure fixed against a range total has no honest
+                      share to print — hide the 0% rather than show one. */}
+                  {m.percent > 0 ? (
+                    <div className="mt-1 text-[12.5px] font-semibold uppercase leading-none tracking-[0.08em] text-neutral-700">
+                      {m.percent}%
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}

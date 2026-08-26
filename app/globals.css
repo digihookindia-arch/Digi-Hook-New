@@ -36,6 +36,21 @@
   --color-accent-800: #7c1405;
   --color-accent-900: #4d170e;
 
+  /* Lighthouse score scale - deliberately outside the Modernist palette.
+     The live-work section quotes Google's own widget, and a client who checks
+     one of those sites in PageSpeed Insights has to see the same colours in
+     both places, or the two readings look like different measurements.
+     The vivid values are ring strokes only - decorative fills that never carry
+     text (pass is 1.90:1 on the ground and would fail AA badly). The -ink
+     variants are the text-safe darkenings, measured on --color-bg:
+     pass-ink 5.91:1, average-ink 5.66:1, fail-ink 6.41:1. */
+  --color-score-pass: #0cce6b;
+  --color-score-pass-ink: #0a6b3b;
+  --color-score-average: #ffa400;
+  --color-score-average-ink: #8a5300;
+  --color-score-fail: #ff4e42;
+  --color-score-fail-ink: #ae1800;
+
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;

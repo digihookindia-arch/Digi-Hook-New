@@ -255,9 +255,13 @@ export function MilestonesView({
                       {amounts[i]}
                     </div>
                   ) : null}
-                  <div className="mt-1.5 text-[13px] font-semibold uppercase leading-none tracking-[0.08em] text-neutral-700">
-                    {milestone.percent}% of total
-                  </div>
+                  {/* Same guard as ProposalView: a rupee figure fixed against
+                      a range total has no honest share to print. */}
+                  {milestone.percent > 0 ? (
+                    <div className="mt-1.5 text-[13px] font-semibold uppercase leading-none tracking-[0.08em] text-neutral-700">
+                      {milestone.percent}% of total
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}

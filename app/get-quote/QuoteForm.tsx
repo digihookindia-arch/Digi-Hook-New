@@ -622,6 +622,10 @@ export function QuoteForm() {
       if (raw) {
         const parsed = JSON.parse(raw) as { step?: number; answers?: QuoteAnswers };
         const restored = { ...EMPTY_ANSWERS, ...(parsed.answers ?? {}) };
+        // sessionStorage does not exist on the server, so a visitor's saved
+        // progress cannot be read during render without a hydration mismatch.
+        // Restoring after mount is the only correct order here.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setAnswers(restored);
         const max = getTotalSteps(restored.websiteType as string);
         if (typeof parsed.step === 'number' && parsed.step >= 1 && parsed.step <= max) {

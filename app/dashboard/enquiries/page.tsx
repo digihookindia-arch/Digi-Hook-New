@@ -46,8 +46,8 @@ export default async function EnquiriesPage() {
           <p className="m-0 mb-5 border-l-2 border-accent py-1 pl-4 text-[14.5px] leading-[1.55] text-accent-700">
             <strong className="font-heading">Email is not configured.</strong> Briefs are
             still captured here, but no acknowledgement reaches the client and no
-            notification reaches the studio. Set <code>RESEND_API_KEY</code> in{' '}
-            <code>.env.local</code>.
+            notification reaches the studio. Set <code>SMTP_USER</code> and{' '}
+            <code>SMTP_PASS</code> in <code>.env.local</code>.
           </p>
         ) : null}
 

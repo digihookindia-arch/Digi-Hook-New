@@ -6,7 +6,6 @@ import { metaDescriptions } from '@/content/meta';
 import { routes } from '@/content/navigation';
 import { Reveal } from '@/components/Reveal';
 import { CtaBand } from '@/components/CtaBand';
-import { HeroGlassLogo } from '@/components/hero/HeroGlassLogo';
 import {
   homeHero,
   standards,
@@ -91,23 +90,30 @@ export default function HomePage() {
               CLS 0.10, which the standards row directly below repeats with
               fuller explanations. The copy for it is still in content/home.ts
               (`readout`, and homeHero.readout*) if this needs reverting. */}
-          {/* No <Reveal> wrapper here on purpose — it renders a div
-              unconditionally, which would leave an empty grid item and its row
-              gap on mobile. HeroGlassLogo wraps itself and returns null below
-              900px, so the column disappears outright. */}
-          <HeroGlassLogo />
+          {/* The second hero column was a WebGL glass logo (components/hero/,
+              three + @react-three, a .glb and a Draco decoder). Removed for
+              page speed: it shipped a 3D runtime and ~900KB of assets to render
+              decoration on desktop only. The hero row is sized by the taller
+              left column, so nothing here shifts without it. */}
         </div>
       </section>
 
       {/* ── Standards row ────────────────────────────────────────────────── */}
       <section className="border-b-2 border-divider">
         <div className="mx-auto max-w-content px-gutter">
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))]">
+          {/* Two-up on phones, then auto-fit. The auto-fit minimum is 210px,
+              which no phone can satisfy twice, so this row used to stack into
+              four full-width blocks — a lot of scrolling for four short stats
+              that are meant to be read together at a glance. */}
+          <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))]">
             {standards.map((s, i) => (
               <Reveal
                 key={s.name}
                 index={i}
-                className="border-r border-neutral-300 py-[clamp(28px,4vw,48px)] pr-6"
+                /* In a 2x2 the right-hand cells sit against the container edge,
+                   so their divider is dropped and a horizontal one separates
+                   the rows instead. Above `sm` the original single rule returns. */
+                className="border-neutral-300 py-[clamp(28px,4vw,48px)] pr-6 max-sm:pr-4 border-r max-sm:[&:nth-child(2n)]:border-r-0 max-sm:[&:nth-child(-n+2)]:border-b max-sm:[&:nth-child(2n)]:pl-5"
               >
                 <div className="mb-2.5 font-heading text-[clamp(30px,3.4vw,52px)] font-extrabold leading-none tracking-[-0.035em]">
                   {s.value}

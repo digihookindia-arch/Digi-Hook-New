@@ -35,6 +35,16 @@ const config: Config = {
           800: 'var(--color-accent-800)',
           900: 'var(--color-accent-900)',
         },
+        // Lighthouse score scale. `-ink` is the text-safe pair for each ring
+        // colour; see the contrast note beside the tokens in globals.css.
+        score: {
+          pass: 'var(--color-score-pass)',
+          'pass-ink': 'var(--color-score-pass-ink)',
+          average: 'var(--color-score-average)',
+          'average-ink': 'var(--color-score-average-ink)',
+          fail: 'var(--color-score-fail)',
+          'fail-ink': 'var(--color-score-fail-ink)',
+        },
         neutral: {
           100: 'var(--color-neutral-100)',
           200: 'var(--color-neutral-200)',

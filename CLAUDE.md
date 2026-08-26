@@ -153,11 +153,14 @@ caught and logged, never surfaced, because losing the lead is worse than a missi
 acknowledgement.
 
 ### Email
-`lib/email.ts`, provider-agnostic and dependency-free (Resend is a single JSON POST).
-With no `RESEND_API_KEY` it logs instead of sending and `isEmailConfigured()` returns
-false so the dashboard says so plainly — **it never pretends to have sent anything**.
-The one address is `sales@digihook.in` (sender, notification inbox, and the published
-`site.email`). Needs the domain verified with the provider before it will send.
+`lib/email.ts` sends via the studio's own Hostinger mailbox over SMTP (nodemailer),
+not a third-party API. digihook.in's DNS already carries Hostinger's DKIM/SPF/DMARC
+records for this mailbox, so sending through it rides on authentication that's
+already verified — deliberately avoids standing up a second provider with its own
+separate domain verification. With no `SMTP_USER`/`SMTP_PASS` it logs instead of
+sending and `isEmailConfigured()` returns false so the dashboard says so plainly —
+**it never pretends to have sent anything**. The one address is `sales@digihook.in`
+(sender, SMTP login, notification inbox, and the published `site.email`).
 
 ### Proposal dashboard (`/dashboard`)
 Shared team password → HMAC session cookie. `middleware.ts` only checks a cookie

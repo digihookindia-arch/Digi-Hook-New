@@ -2,34 +2,45 @@
   "name": "digihook-website",
   "version": "1.0.0",
   "private": true,
+  "//engines": "Storage is node:sqlite, which does not exist before Node 22. Hostinger's build pipeline defaults to Node 20 when nothing declares otherwise, and the resulting app builds fine and then fails at runtime on the first database call. This field is what makes it pick 22.",
+  "engines": {
+    "node": ">=22"
+  },
+  "//overrides": "Transitive packages the dependency scanner flags that nothing else will lift, because the versions are pinned deep inside other packages' trees. Each has a patch release; none needs a major upgrade of a direct dependency. The eslint entry is the odd one: eslint 9 still ships minimatch 3, whose brace-expansion 1.x has no fix for CVE-2026-14257 — the advisory's only remedy is the 5.x line, so minimatch is lifted to 10 within eslint's subtree to get there. Re-check all of these after any upgrade; an override that outlives its reason is how a tree silently drifts.",
+  "overrides": {
+    "js-yaml": "^4.3.1",
+    "brace-expansion": "^5.0.9",
+    "sharp": "^0.35.0",
+    "eslint": {
+      "minimatch": "^10.2.6"
+    }
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx lib/enquiry.test.ts && tsx lib/delivery.test.ts",
+    "test": "tsx lib/enquiry.test.ts && tsx lib/delivery.test.ts && tsx lib/journey.test.ts",
     "seo": "node scripts/seo-check.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.6.1",
+    "@types/nodemailer": "^8.0.1",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.469.0",
-    "next": "^15.1.6",
+    "next": "^16.3.0",
+    "nodemailer": "^9.0.5",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "three": "^0.185.1"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@types/three": "^0.185.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.18.0",
-    "eslint-config-next": "^15.1.6",
+    "eslint-config-next": "^16.3.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.23.1",

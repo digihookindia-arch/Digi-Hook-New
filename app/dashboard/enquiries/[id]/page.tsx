@@ -1,9 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowRight, Trash2 } from 'lucide-react';
-import { getEnquiry, ENQUIRY_STATUSES } from '@/lib/enquiries';
+import { ENQUIRY_STATUSES } from '@/lib/enquiries';
+import { getJourney } from '@/lib/journey';
+import { isEmailConfigured } from '@/lib/email';
+import { ClientUpdates } from '@/components/ClientUpdates';
 import { requireSession } from '../../actions';
-import { updateEnquiryStatus, removeEnquiry } from '../actions';
+import { updateEnquiryStatus, removeEnquiry, sendMilestoneAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,8 +18,10 @@ export default async function EnquiryPage({
   await requireSession();
 
   const { id } = await params;
-  const enquiry = await getEnquiry(id);
-  if (!enquiry) notFound();
+  const journey = await getJourney(id);
+  // getJourney resolves from the enquiry, so a journey here always has one.
+  if (!journey?.enquiry) notFound();
+  const { enquiry } = journey;
 
   return (
     <main>
@@ -61,6 +66,13 @@ export default async function EnquiryPage({
           </Field>
           {enquiry.company ? <Field label="Company">{enquiry.company}</Field> : null}
         </div>
+
+        <ClientUpdates
+          target={{ enquiryId: enquiry.id }}
+          rows={journey.rows}
+          action={sendMilestoneAction}
+          emailConfigured={isEmailConfigured()}
+        />
 
         <h2 className="m-0 mb-4 font-heading text-[22px] font-bold leading-[1.2] tracking-[-0.025em]">
           The brief

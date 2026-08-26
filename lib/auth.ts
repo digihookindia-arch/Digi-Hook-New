@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
+import { SESSION_COOKIE, SESSION_MAX_AGE } from './cookies';
 
 /**
  * Dashboard auth: one shared team password, exchanged for a signed session
@@ -6,8 +7,11 @@ import { createHmac, timingSafeEqual } from 'crypto';
  * `expiry.signature`, verified with an HMAC the browser cannot forge.
  */
 
-export const SESSION_COOKIE = 'dh_dash';
-export const SESSION_MAX_AGE = 60 * 60 * 12; // 12 hours
+// Defined in ./cookies so the middleware can read the name without dragging
+// this module — and Node's crypto — into the Edge runtime. Imported rather
+// than re-exported blind, because `createSessionToken` below uses the max age;
+// the re-export keeps every existing import of this module working.
+export { SESSION_COOKIE, SESSION_MAX_AGE };
 
 function secret(): string {
   const value = process.env.AUTH_SECRET;

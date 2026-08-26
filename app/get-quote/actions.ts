@@ -2,6 +2,8 @@
 
 import { formatInr, BUDGET_RULES, TYPE_QUESTION } from '@/content/quote';
 import { sendEmail, STUDIO_INBOX } from '@/lib/email';
+import { enquiryReceivedEmail } from '@/lib/milestoneEmails';
+import { sendMilestone } from '@/lib/sentEmails';
 import { validateAndPruneQuoteAnswers, type QuoteSource } from '@/lib/quote';
 import { saveQuoteLead, type QuoteLead } from '@/lib/quoteLeads';
 import { SITE_URL } from '@/lib/site';
@@ -51,6 +53,20 @@ function budgetLine(lead: QuoteLead): string {
 async function notify(lead: QuoteLead): Promise<void> {
   const typeLabel =
     TYPE_QUESTION.options.find((o) => o.id === lead.websiteType)?.title ?? lead.websiteType;
+
+  // The same acknowledgement the contact form sends. This funnel shipped
+  // notifying only the studio, which meant someone who filled in the longer
+  // ad-funnel form heard nothing at all — and had no written confirmation that
+  // their budget answer had been received.
+  if (lead.email) {
+    await sendMilestone({
+      stage: 1,
+      to: lead.email,
+      mail: enquiryReceivedEmail({ name: lead.name, enquiryId: lead.id }),
+      target: { leadId: lead.id },
+      replyTo: STUDIO_INBOX,
+    });
+  }
 
   await sendEmail({
     to: STUDIO_INBOX,

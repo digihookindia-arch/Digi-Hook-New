@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import {
   pillars,
+  pillarsIntro,
   rendering,
   disciplines,
   engineeringFaqs,
@@ -9,6 +10,8 @@ import { routes } from '@/content/navigation';
 import { PageHero } from '@/components/PageHero';
 import { Reveal } from '@/components/Reveal';
 import { CheckItem } from '@/components/CheckItem';
+import { WorkShowcase } from '@/components/WorkShowcase';
+import { StandardBand } from '@/components/StandardBand';
 import { FaqSection } from '@/components/FaqSection';
 import { CtaBand } from '@/components/CtaBand';
 import { pageMetadata } from '@/lib/seo';
@@ -52,10 +55,24 @@ export default function Page() {
           titleMax="18ch"
         />
 
+        {/* The standard, then the evidence for it. Both sit above the four
+            pillars now: the page argues from results and explains afterwards. */}
+        <StandardBand />
+
+        <WorkShowcase />
+
         {/* Four pillars */}
         <section className="border-b-2 border-divider">
-          <div className="mx-auto max-w-content px-gutter">
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))]">
+          <div className="mx-auto max-w-content px-gutter py-[clamp(56px,7vh,96px)]">
+            <div className="mb-[clamp(28px,4vh,44px)] max-w-[52ch]">
+              <div className="mb-[18px] text-[12px] font-semibold uppercase leading-none tracking-[0.14em] text-accent-700">
+                {pillarsIntro.kicker}
+              </div>
+              <h2 className="m-0 font-heading text-[clamp(28px,3.6vw,50px)] font-extrabold leading-[1.04] tracking-[-0.035em]">
+                {pillarsIntro.title}
+              </h2>
+            </div>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] border-t border-neutral-300">
               {pillars.map((p, i) => (
                 <Reveal
                   key={p.num}
@@ -65,9 +82,9 @@ export default function Page() {
                   <div className="mb-4 text-[12px] font-semibold leading-none tracking-[0.14em] text-accent-700">
                     {p.num}
                   </div>
-                  <h2 className="m-0 mb-3 font-heading text-[clamp(19px,1.7vw,24px)] font-bold leading-[1.15] tracking-[-0.02em]">
+                  <h3 className="m-0 mb-3 font-heading text-[clamp(19px,1.7vw,24px)] font-bold leading-[1.15] tracking-[-0.02em]">
                     {p.title}
-                  </h2>
+                  </h3>
                   <p className="m-0 text-[14.5px] leading-[1.55] text-neutral-800">
                     {p.body}
                   </p>

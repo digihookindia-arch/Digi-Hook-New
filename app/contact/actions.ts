@@ -2,8 +2,10 @@
 
 import { detailQuestions } from '@/content/enquiry';
 import { sendEmail, STUDIO_INBOX } from '@/lib/email';
+import { enquiryReceivedEmail } from '@/lib/milestoneEmails';
+import { sendMilestone } from '@/lib/sentEmails';
 import { saveEnquiry, type Enquiry } from '@/lib/enquiries';
-import { site, SITE_URL } from '@/lib/site';
+import { SITE_URL } from '@/lib/site';
 import {
   isServiceKey,
   questionsFor,
@@ -116,24 +118,16 @@ async function notify(enquiry: Enquiry): Promise<void> {
     .join('\n');
 
   await Promise.all([
-    sendEmail({
+    // Through the send log, not sendEmail directly — this is stage 1 of the
+    // same four the dashboard sends by hand, and it belongs in the same
+    // history. Without the row, the panel would show the one email that fires
+    // automatically as never sent.
+    sendMilestone({
+      stage: 1,
       to: enquiry.email,
+      mail: enquiryReceivedEmail({ name: enquiry.name, enquiryId: enquiry.id }),
+      target: { enquiryId: enquiry.id },
       replyTo: STUDIO_INBOX,
-      subject: 'We have your project brief — Digi Hook',
-      body: [
-        `Hi ${enquiry.name.split(' ')[0]},`,
-        '',
-        'Thank you for sending your requirements. They have reached our team and nothing more is needed from you right now.',
-        '',
-        'What happens next: we read the brief properly, and send you a written proposal covering scope, the technology we would use and why, a stage-by-stage timeline and the costs. If anything in your brief needs a conversation first, we will call you on the number you gave us.',
-        '',
-        'You will hear from us within one working day.',
-        '',
-        `If you need us sooner, call ${site.phoneDisplay}.`,
-        '',
-        '— The team at Digi Hook',
-        site.addressLine,
-      ].join('\n'),
     }),
 
     sendEmail({

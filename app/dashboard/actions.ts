@@ -10,7 +10,7 @@ import {
   createSessionToken,
   verifySessionToken,
 } from '@/lib/auth';
-import { linkEnquiryToProposal } from '@/lib/enquiries';
+import { getEnquiry, linkEnquiryToProposal } from '@/lib/enquiries';
 import {
   deleteProposal,
   getProposal,
@@ -28,6 +28,7 @@ import {
   parseStages,
   seedDelivery,
 } from '@/lib/delivery';
+import { parseProposalContent } from '@/lib/proposalContent';
 import { draftProposal, reviseProposal } from '@/lib/claude';
 
 /**
@@ -77,7 +78,18 @@ export async function signOut(): Promise<void> {
   redirect('/dashboard/login');
 }
 
-export type DraftState = { error?: string };
+/**
+ * `revisedAt` and `unchanged` exist because a revision that succeeds is
+ * otherwise indistinguishable from one that never ran: the button stops saying
+ * "Revising…" and nothing else on the page has to visibly move. Silence read as
+ * failure and cost a real afternoon.
+ */
+export type DraftState = {
+  error?: string;
+  revisedAt?: string;
+  /** Claude returned the proposal byte-identical — the instruction did nothing. */
+  unchanged?: boolean;
+};
 
 export async function createProposal(
   _prev: DraftState,
@@ -93,6 +105,12 @@ export async function createProposal(
   if (brief.length < 20) {
     return { error: 'Give Claude a bit more to work with — a few sentences at least.' };
   }
+
+  // Read the source enquiry before drafting, so the client's contact details
+  // travel onto the proposal. Without them stages 3 and 4 have nobody to mail,
+  // and the studio would be re-typing an address that is already on file.
+  const enquiryId = String(formData.get('enquiry') ?? '').trim();
+  const source = enquiryId ? await getEnquiry(enquiryId) : null;
 
   let result;
   try {
@@ -110,6 +128,10 @@ export async function createProposal(
     content: result.content,
     brief,
     budget,
+    // Empty when drafted without an enquiry — the dashboard then asks for an
+    // address before it will send anything.
+    clientEmail: source?.email ?? '',
+    clientPhone: source?.phone ?? '',
     createdAt: now,
     updatedAt: now,
     // Accepted later — by the client on the page, or the studio after a call.
@@ -129,7 +151,6 @@ export async function createProposal(
   // Drafted from an enquiry: link the two and move it out of the open list.
   // Non-fatal — the proposal exists either way, and a broken link is a smaller
   // problem than throwing away a draft that took a paid API call to produce.
-  const enquiryId = String(formData.get('enquiry') ?? '').trim();
   if (enquiryId) {
     try {
       await linkEnquiryToProposal(enquiryId, proposal.slug);
@@ -168,15 +189,66 @@ export async function reviseProposalAction(
   }
   if (!result.ok) return { error: result.error };
 
-  await saveProposal({
-    ...existing,
-    content: result.content,
-    updatedAt: new Date().toISOString(),
-  });
+  // Claude is told never to state a payment split, and the schedule the client
+  // reads comes from `milestones`, not `content` — so "make it 50% upfront"
+  // comes back with the document untouched. Saving that and saying nothing is
+  // what made Revise look broken. Report it instead.
+  const unchanged =
+    JSON.stringify(result.content) === JSON.stringify(existing.content);
+  if (unchanged) return { unchanged: true };
+
+  const revisedAt = new Date().toISOString();
+  try {
+    await saveProposal({ ...existing, content: result.content, updatedAt: revisedAt });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Could not save the revision.' };
+  }
 
   revalidatePath(`/dashboard/${slug}`);
   revalidatePath(`/proposals/${slug}`);
-  return {};
+  return { revisedAt };
+}
+
+export type ContentState = { error?: string; savedAt?: string };
+
+/**
+ * Saves a hand-typed proposal document — the manual alternative to Revise, for
+ * the cases Claude structurally cannot make (the payment split) and the cases
+ * where typing the one line yourself is just faster than describing it. Writes
+ * only `content`; `assets` / `milestones` / `stages` are untouched, same
+ * separation `saveDelivery` keeps in the other direction.
+ */
+export async function saveProposalContentAction(
+  _prev: ContentState,
+  formData: FormData
+): Promise<ContentState> {
+  await requireSession();
+
+  const slug = String(formData.get('slug') ?? '');
+  if (!slug) return { error: 'Which proposal is this?' };
+
+  const existing = await getProposal(slug);
+  if (!existing) return { error: 'That proposal no longer exists.' };
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(String(formData.get('content') ?? '{}'));
+  } catch {
+    return { error: 'The editor sent something malformed. Reload and try again.' };
+  }
+
+  const { content, errors } = parseProposalContent(payload);
+  if (errors.length > 0) return { error: errors.join(' ') };
+
+  try {
+    await saveProposal({ ...existing, content, updatedAt: new Date().toISOString() });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Could not save.' };
+  }
+
+  revalidatePath(`/dashboard/${slug}`);
+  revalidatePath(`/proposals/${slug}`);
+  return { savedAt: new Date().toISOString() };
 }
 
 export type DeliveryState = { error?: string; savedAt?: string };

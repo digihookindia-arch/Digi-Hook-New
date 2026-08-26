@@ -25,6 +25,14 @@ export type Milestone = {
   percent: number;
   status: MilestoneStatus;
   note: string;
+  /**
+   * An exact rupee figure for this payment, overriding the percent-derived
+   * amount. Null means "derive from the total" — the default, and what every
+   * row stored before this field existed reads back as. Set by the studio when
+   * the split is agreed in rupees rather than shares, or when the proposal
+   * total is a range and percentages alone cannot produce a figure.
+   */
+  amount: number | null;
 };
 export type WorkStage = { label: string; detail: string; status: StageStatus };
 
@@ -57,9 +65,9 @@ export const STAGE_LABELS: Record<StageStatus, string> = {
  * per project from the dashboard — this is only where a new proposal starts.
  */
 export const DEFAULT_MILESTONES: Milestone[] = [
-  { label: 'Advance', percent: 20, status: 'pending', note: 'Due on sign-off, before work starts.' },
-  { label: 'Frontend complete', percent: 30, status: 'pending', note: 'Due when the build is ready for your review.' },
-  { label: 'On completion', percent: 50, status: 'pending', note: 'Due on handover, before the site goes live.' },
+  { label: 'Advance', percent: 20, status: 'pending', note: 'Due on sign-off, before work starts.', amount: null },
+  { label: 'Frontend complete', percent: 30, status: 'pending', note: 'Due when the build is ready for your review.', amount: null },
+  { label: 'On completion', percent: 50, status: 'pending', note: 'Due on handover, before the site goes live.', amount: null },
 ];
 
 /**
@@ -121,25 +129,41 @@ export function parseAmount(total: string): number | null {
 }
 
 /**
- * Milestone amounts as display strings, or nulls when the total is not a single
- * figure. The last payable row absorbs the rounding remainder so the parts add
- * up to the total exactly — a client who adds the column up will do so.
+ * The rupee value of each milestone: an explicit `amount` when the studio has
+ * set one, otherwise the row's share of the total — or null when neither can
+ * produce a figure (a range total with no override).
  */
+export function milestoneAmountValues(
+  total: string,
+  milestones: Milestone[]
+): (number | null)[] {
+  const value = parseAmount(total);
+  const raw = milestones.map((m) =>
+    m.amount ?? (value === null ? null : Math.round((value * m.percent) / 100))
+  );
+
+  // The last payable row absorbs the rounding remainder so the parts add up to
+  // the total exactly — a client who adds the column up will do so. Only in
+  // pure percent mode claiming the whole total: an explicit figure anywhere
+  // means the studio is managing the sums by hand, and a "correction" would
+  // silently rewrite a number somebody typed on purpose.
+  const last = raw.length - 1;
+  const pure = milestones.every((m) => m.amount === null);
+  if (value !== null && last >= 0 && pure && totalPercent(milestones) === 100) {
+    const drift = value - raw.reduce((sum: number, n) => sum + (n ?? 0), 0);
+    raw[last] = (raw[last] ?? 0) + drift;
+  }
+  return raw;
+}
+
+/** Milestone amounts as display strings, nulls where no figure exists. */
 export function milestoneAmounts(
   total: string,
   milestones: Milestone[]
 ): (string | null)[] {
-  const value = parseAmount(total);
-  if (value === null) return milestones.map(() => null);
-
-  const raw = milestones.map((m) => Math.round((value * m.percent) / 100));
-  const last = raw.length - 1;
-  // Only correct the rounding drift when the percentages claim the whole total.
-  if (last >= 0 && totalPercent(milestones) === 100) {
-    const drift = value - raw.reduce((sum, n) => sum + n, 0);
-    raw[last] = (raw[last] ?? 0) + drift;
-  }
-  return raw.map(formatInr);
+  return milestoneAmountValues(total, milestones).map((n) =>
+    n === null ? null : formatInr(n)
+  );
 }
 
 export function totalPercent(milestones: Milestone[]): number {
@@ -203,11 +227,22 @@ export function parseMilestones(input: string | unknown[]): Milestone[] {
     .map((r) => {
       const row = (r ?? {}) as Record<string, unknown>;
       const percent = Number(row.percent);
+      // Rows stored before the amount column, and rows in percent mode, have
+      // no amount — both must read back as null, not 0, or every old schedule
+      // would suddenly claim three ₹0 payments.
+      const amount =
+        row.amount === null || row.amount === undefined || row.amount === ''
+          ? null
+          : Number(row.amount);
       return {
         label: text(row.label, 120),
         percent: Number.isFinite(percent) ? Math.min(100, Math.max(0, Math.round(percent))) : 0,
         status: oneOf(row.status, MILESTONE_STATUSES, 'pending'),
         note: text(row.note),
+        amount:
+          amount !== null && Number.isFinite(amount) && amount >= 0
+            ? Math.round(amount)
+            : null,
       };
     })
     .filter((m) => m.label.length > 0);
