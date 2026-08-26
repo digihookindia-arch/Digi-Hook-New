@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 
 /**
  * Dashboard auth: one shared team password, exchanged for a signed session
@@ -71,4 +71,106 @@ export function verifyAccessToken(
 ): boolean {
   if (!token) return false;
   return safeEqual(token, createAccessToken(slug, code));
+}
+
+/* ── client portal accounts ─────────────────────────────────────────────── */
+
+export const CLIENT_COOKIE = 'dh_client';
+export const CLIENT_SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+
+/**
+ * Password hashing via scrypt from node:crypto — no dependency to install.
+ * The stored format is self-describing (scrypt:N:r:p:salt:hash, all hex for
+ * the last two) so the cost parameters can be raised later without
+ * invalidating hashes written at the old cost.
+ */
+const SCRYPT_N = 16384;
+const SCRYPT_R = 8;
+const SCRYPT_P = 1;
+const SCRYPT_KEYLEN = 64;
+
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16);
+  const hash = scryptSync(password, salt, SCRYPT_KEYLEN, {
+    N: SCRYPT_N,
+    r: SCRYPT_R,
+    p: SCRYPT_P,
+  });
+  return [
+    'scrypt',
+    SCRYPT_N,
+    SCRYPT_R,
+    SCRYPT_P,
+    salt.toString('hex'),
+    hash.toString('hex'),
+  ].join(':');
+}
+
+/**
+ * False, never a throw, on anything malformed — an empty or corrupted stored
+ * value must read as "wrong password", not a 500 on the login page. An empty
+ * hash also covers invited-but-not-activated accounts, which cannot sign in.
+ */
+export function verifyPassword(password: string, stored: string): boolean {
+  try {
+    const [scheme, n, r, p, saltHex, hashHex] = stored.split(':');
+    if (scheme !== 'scrypt' || !saltHex || !hashHex) return false;
+    const expected = Buffer.from(hashHex, 'hex');
+    const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length, {
+      N: Number(n),
+      r: Number(r),
+      p: Number(p),
+    });
+    return expected.length > 0 && timingSafeEqual(actual, expected);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Portal session token: clientId.expires.signature. The signed payload is
+ * prefixed 'client:' so a token minted for the portal can never verify as a
+ * dashboard session or a proposal access token, and vice versa.
+ */
+export function createClientSessionToken(clientId: string): string {
+  const expires = Date.now() + CLIENT_SESSION_MAX_AGE * 1000;
+  return `${clientId}.${expires}.${sign(`client:${clientId}:${expires}`)}`;
+}
+
+/** The clientId when the token is valid and unexpired, else null. */
+export function verifyClientSessionToken(token: string | undefined): string | null {
+  if (!token) return null;
+  const [clientId, expires, signature] = token.split('.');
+  if (!clientId || !expires || !signature) return null;
+  if (!safeEqual(signature, sign(`client:${clientId}:${expires}`))) return null;
+  return Number(expires) > Date.now() ? clientId : null;
+}
+
+/**
+ * Set-password link token, used for both the invite and forgot-password
+ * emails: clientId.expires.signature, signed over the account's *current*
+ * password hash. The hash itself never appears in the token — it is only
+ * HMAC input — so setting a password changes the hash and kills every
+ * outstanding link for that account. Single-use without a tokens table.
+ */
+export function createSetPasswordToken(
+  clientId: string,
+  currentPasswordHash: string,
+  maxAgeMs: number
+): string {
+  const expires = Date.now() + maxAgeMs;
+  return `${clientId}.${expires}.${sign(`setpw:${clientId}:${expires}:${currentPasswordHash}`)}`;
+}
+
+/** The clientId when the link is valid for the account's current hash, else null. */
+export function verifySetPasswordToken(
+  token: string | undefined,
+  currentPasswordHash: string
+): string | null {
+  if (!token) return null;
+  const [clientId, expires, signature] = token.split('.');
+  if (!clientId || !expires || !signature) return null;
+  if (!safeEqual(signature, sign(`setpw:${clientId}:${expires}:${currentPasswordHash}`)))
+    return null;
+  return Number(expires) > Date.now() ? clientId : null;
 }

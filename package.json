@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx lib/enquiry.test.ts && tsx lib/delivery.test.ts",
+    "test": "tsx lib/enquiry.test.ts && tsx lib/delivery.test.ts && tsx lib/portal.test.ts",
     "seo": "node scripts/seo-check.mjs"
   },
   "dependencies": {

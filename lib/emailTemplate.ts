@@ -94,8 +94,13 @@ export type MilestoneEmailInput = {
   detailLeftHref?: string;
   detailRightLabel: string;
   detailRightValue: string;
-  /** Which of the 4 milestones this email represents — highlights that step in the track. */
-  step: MilestoneStep;
+  /**
+   * Which of the 4 milestones this email represents — highlights that step in
+   * the track. Omit it and the track section disappears entirely: the portal
+   * emails (invites, tickets) are not on the proposal journey, and showing a
+   * four-step sales track on a support ticket would be nonsense.
+   */
+  step?: MilestoneStep;
   /**
    * Overrides the step-2 label in the track. Two words only, same as the
    * defaults. Used by the enquiry email, which is sent before the call and so
@@ -108,6 +113,12 @@ export type MilestoneEmailInput = {
    *  not escaped, so it can carry an inline mailto/tel link. Never pass
    *  unescaped user input here. */
   secondaryLine: string;
+  /**
+   * The footer's "what this message is" sentence. Plain text, escaped.
+   * Defaults to the project-enquiry wording the milestone emails were built
+   * with; portal emails pass their own.
+   */
+  footerNote?: string;
 };
 
 export function milestoneEmailHtml(input: MilestoneEmailInput): string {
@@ -147,6 +158,29 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
           </table>
         </td>`;
   }).join('');
+
+  const track = input.step
+    ? `
+  <!-- milestone track -->
+  <tr>
+    <td class="px" style="padding:34px 40px 36px 40px;border-bottom:2px solid #201e1d;font-family:Arial,Helvetica,sans-serif;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
+      <tr>
+        <td valign="middle" style="padding-bottom:22px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#6b6764;font-weight:bold;">How this moves forward</td>
+        <td valign="middle" align="right" style="padding-bottom:22px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#ec3013;font-weight:bold;">Step ${input.step} of 4</td>
+      </tr>
+      </table>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
+      <tr>${steps}
+      </tr>
+      </table>
+    </td>
+  </tr>`
+    : '';
+
+  const footerNote =
+    input.footerNote ??
+    "This message confirms an update on a project enquiry with Digi Hook. No action is needed if this wasn't you";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -235,21 +269,7 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
     </td>
   </tr>
 
-  <!-- milestone track -->
-  <tr>
-    <td class="px" style="padding:34px 40px 36px 40px;border-bottom:2px solid #201e1d;font-family:Arial,Helvetica,sans-serif;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
-      <tr>
-        <td valign="middle" style="padding-bottom:22px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#6b6764;font-weight:bold;">How this moves forward</td>
-        <td valign="middle" align="right" style="padding-bottom:22px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.8px;text-transform:uppercase;color:#ec3013;font-weight:bold;">Step ${input.step} of 4</td>
-      </tr>
-      </table>
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
-      <tr>${steps}
-      </tr>
-      </table>
-    </td>
-  </tr>
+${track}
 
   <!-- action -->
   <tr>
@@ -278,7 +298,7 @@ export function milestoneEmailHtml(input: MilestoneEmailInput): string {
         &nbsp;·&nbsp; ${escapeHtml(site.hoursLine)}
       </p>
       <p style="margin:0;font-size:12px;line-height:20px;mso-line-height-rule:exactly;color:#9d9896;">
-        This message confirms an update on a project enquiry with Digi Hook. No action is needed if this wasn't you — write to
+        ${escapeHtml(footerNote)} &mdash; write to
         <a href="mailto:${site.email}" style="color:#f3f2f2;text-decoration:underline;">${site.email}</a>.
       </p>
     </td>

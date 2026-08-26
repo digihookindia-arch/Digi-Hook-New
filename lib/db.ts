@@ -93,6 +93,75 @@ const SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS quote_leads_created_at ON quote_leads (created_at DESC);
   CREATE INDEX IF NOT EXISTS quote_leads_status ON quote_leads (status);
+
+  /*
+   * Client portal accounts (email + password login at /portal). Deliberately
+   * unrelated to proposals and their access codes - the portal is its own
+   * surface. password_hash is '' between the studio's invite and the client
+   * first setting a password; that empty value is also what makes the
+   * stateless set-password link single-use, because the link signs over the
+   * current hash (see lib/auth.ts).
+   */
+  CREATE TABLE IF NOT EXISTS clients (
+    id            TEXT PRIMARY KEY,
+    email         TEXT NOT NULL UNIQUE,
+    name          TEXT NOT NULL,
+    password_hash TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL
+  );
+
+  /*
+   * One portal engagement per row - the page a client sees after logging in.
+   * Every field is studio-entered from the dashboard; nothing derives from
+   * proposals. Amounts are whole rupees; total_inr null means payments are
+   * not set up yet and the portal hides that panel.
+   */
+  CREATE TABLE IF NOT EXISTS portal_projects (
+    id            TEXT PRIMARY KEY,
+    client_id     TEXT NOT NULL,
+    business_name TEXT NOT NULL,
+    live_at       TEXT,
+    support_days  INTEGER NOT NULL DEFAULT 180,
+    total_inr     INTEGER,
+    paid_inr      INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS portal_projects_client ON portal_projects (client_id);
+
+  /*
+   * Support tickets and feature requests raised from the portal. kind
+   * separates the two tabs. out_of_support is stamped at creation from the
+   * project's support window - editing the live date later must not rewrite
+   * history. last_sender drives the dashboard badge: a ticket needs studio
+   * attention whenever the client spoke last and it is not closed. The
+   * opening message lives in ticket_messages like every reply, so the
+   * thread renders uniformly.
+   */
+  CREATE TABLE IF NOT EXISTS tickets (
+    id             TEXT PRIMARY KEY,
+    project_id     TEXT NOT NULL,
+    client_id      TEXT NOT NULL,
+    kind           TEXT NOT NULL DEFAULT 'support',
+    subject        TEXT NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'open',
+    out_of_support INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    last_sender    TEXT NOT NULL DEFAULT 'client'
+  );
+  CREATE INDEX IF NOT EXISTS tickets_created_at ON tickets (created_at DESC);
+  CREATE INDEX IF NOT EXISTS tickets_status ON tickets (status);
+  CREATE INDEX IF NOT EXISTS tickets_project ON tickets (project_id);
+
+  CREATE TABLE IF NOT EXISTS ticket_messages (
+    id         TEXT PRIMARY KEY,
+    ticket_id  TEXT NOT NULL,
+    author     TEXT NOT NULL,
+    body       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS ticket_messages_ticket ON ticket_messages (ticket_id, created_at);
 `;
 
 /**

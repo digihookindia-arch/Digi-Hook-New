@@ -107,10 +107,10 @@ design system). Read the relevant block there before changing a page's markup.
 
 | Path | What |
 |---|---|
-| `app/` | 16 public routes + `sitemap.ts` / `robots.ts` / `opengraph-image.tsx` per segment; `dashboard/`, `proposals/` |
+| `app/` | 16 public routes + `sitemap.ts` / `robots.ts` / `opengraph-image.tsx` per segment; `dashboard/`, `proposals/`, `portal/` |
 | `content/` | All copy as typed modules. Edit copy here, never in JSX. |
 | `components/` | Shared chrome + `ServicePage` / `DeepPage` / `PageHero` / `Accordion` / `CtaBand` / `ArticleLayout` |
-| `lib/` | `site.ts` (company facts), `seo.ts`, `jsonld.tsx`, `og.tsx`, `enquiry.ts`, `enquiries.ts`, `proposals.ts`, `db.ts`, `email.ts`, `auth.ts`, `claude.ts` |
+| `lib/` | `site.ts` (company facts), `seo.ts`, `jsonld.tsx`, `og.tsx`, `enquiry.ts`, `enquiries.ts`, `proposals.ts`, `db.ts`, `email.ts`, `auth.ts`, `claude.ts`, `clients.ts`, `portalProjects.ts`, `support.ts`, `tickets.ts` / `ticketRules.ts`, `portalEmails.ts` |
 | `scripts/` | `seo-check.mjs` — the crawler behind `npm run seo` |
 
 Shared page layouts exist — check `components/` before hand-rolling new page markup.
@@ -122,9 +122,11 @@ that markup** — a layout fix there must be made twice until it is migrated.
 ### Storage — SQLite, not MongoDB
 
 `lib/db.ts` uses Node's built-in `node:sqlite` (needs Node 24). No dependency, no server,
-one file at `data/digihook.db` (`SQLITE_PATH` overrides; `/data` is gitignored). Two
-tables: `proposals` and `enquiries`. **`content/technology.ts` still lists MongoDB — that
-is marketing copy about the stack offered to clients, not this app. Leave it.**
+one file at `data/digihook.db` (`SQLITE_PATH` overrides; `/data` is gitignored). Seven
+tables: `proposals`, `enquiries`, `quote_leads`, and the portal's `clients` /
+`portal_projects` / `tickets` / `ticket_messages`. **`content/technology.ts` still lists
+MongoDB — that is marketing copy about the stack offered to clients, not this app.
+Leave it.**
 
 SQLite writes to local disk, so this will not survive on Vercel or any serverless host —
 the filesystem is ephemeral and per-instance. Fine on a VPS. Decide before launch.
@@ -240,6 +242,56 @@ parameters each tier accepts. Not every tier takes the same options — **Haiku 
 `output_config.effort`**, so guard anything tier-specific rather than sending it blindly.
 Revisions return only the fields they change and are merged over the existing proposal —
 regenerating the whole document to move one date cost twice as much for no benefit.
+
+### Client portal (`/portal`)
+
+**Standalone by design — not related to proposals** (client's explicit call,
+2026-08-26). Its own login, its own data, its own dashboard section; nothing derives
+from the proposal tables and no code path links the two. A portal client logs in with
+email + password and sees their business name, a simple payment summary (total / paid /
+balance, whole rupees, `total_inr` null hides the panel), and a support plan — a
+studio-set live date plus `support_days` (default 180) rendered as a days-remaining
+countdown by `lib/support.ts` (pure, UTC-midnight arithmetic, window is
+`[live_at, live_at + support_days)`). Tabs: support tickets and feature requests, both
+threaded (`tickets` + `ticket_messages`, one row per message, `BEGIN/COMMIT` around
+ticket-plus-first-message).
+
+- **Auth**: scrypt password hashes (`lib/auth.ts`, `node:crypto`, self-describing
+  `scrypt:N:r:p:salt:hash` format) and an HMAC session cookie `dh_client`
+  (`clientId.expires.sig`, payload prefixed `client:` so tokens never cross-verify with
+  the dashboard's). Set-password links (invite **and** forgot-password) are HMAC tokens
+  signed over the account's *current* password hash — setting a password kills every
+  outstanding link, which is single-use without a tokens table. `middleware.ts` branches
+  on `/portal` but still only checks cookie *presence*; the load-bearing checks are
+  `requireClient()` / `portalProject()` in **every** page and action — same rule as
+  `requireSession()`, do not remove as redundant. Sign-in, forgot and set-password never
+  reveal whether an email has an account.
+- **Accounts are invite-only** — the studio creates them from `/dashboard/portal`
+  (account + project + invite email in one form; an email that already has an account
+  gets the new project added to it). No self-signup, no rate limiting, no honeypot —
+  accepted gaps, revisit if the portal ever opens up.
+- **Out-of-support is stamped at ticket creation** (`out_of_support`), never
+  recomputed — editing the live date later must not rewrite history. Only support
+  tickets are ever flagged (`not_live` counts as in-support); feature requests are
+  quotable work by definition. Expired clients can still submit — the portal says the
+  window has ended and the studio quotes instead of refusing.
+- **The dashboard badge counts `last_sender = 'client' AND status != 'closed'`** —
+  "awaiting a studio reply", not "open" — so it re-lights when a client answers an
+  in-progress ticket. `addMessage()` moves `last_sender` in the same write as the
+  insert; a client reply on a `waiting_client` or `closed` ticket auto-reopens it to
+  `open`, or the message would never surface in that count.
+- **Emails**: `lib/portalEmails.ts` (invite/reset, ticket acknowledgement with a
+  `DH-XXXXXX` ref, studio-reply notification) — the shared shell's milestone track is
+  optional (`step?`) and portal mail omits it. Client-typed text (subjects, replies)
+  goes only into the shell's escaped slots, never `headline`/`secondaryLine`. Studio
+  alerts stay inline plain text with a `/dashboard/tickets/<id>` deep link. Everywhere:
+  persist first, email best-effort in try/catch.
+- **`lib/ticketRules.ts` is the crypto- and sqlite-free half** of the ticket model
+  (statuses, kinds, labels, caps, validators) so the portal's client components can
+  import it; `lib/tickets.ts` re-exports it for server callers — same split as
+  `lib/delivery.ts`.
+- Excluded from search the same three ways as the dashboard: per-page `noindex`
+  metadata, `robots.ts` disallow, absent from the sitemap.
 
 ## SEO is a functional requirement
 
