@@ -34,7 +34,12 @@
       "Bash(curl -s http://localhost:3000/knowledge-hub/nextjs-or-wordpress -o /tmp/b.html)",
       "Bash(curl -s http://localhost:3000/knowledge-hub)",
       "PowerShell(npm test 2>&1)",
-      "PowerShell(npx next lint 2>&1)"
+      "PowerShell(npx next lint 2>&1)",
+      "Bash(npx tsx *)",
+      "Read(//d/Web2/**)",
+      "Bash(ssh -i ~/.ssh/digihook_vps root@200.141.14.174 *)",
+      "Bash(ssh -i ~/.ssh/digihook_vps -o BatchMode=yes root@200.141.14.174 *)",
+      "Bash(GIT_SSH_COMMAND=* git fetch vps *)"
     ]
   }
 }
