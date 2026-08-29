@@ -6,9 +6,11 @@ import { getClient, isActivated } from '@/lib/clients';
 import { supportState } from '@/lib/support';
 import { listAllTicketsForProject, TICKET_KIND_LABELS, TICKET_STATUS_LABELS } from '@/lib/tickets';
 import { formatInr } from '@/lib/delivery';
+import { listDocuments } from '@/lib/documents';
 import { requireSession } from '../../actions';
-import { removeProjectAction, sendPortalLinkAction } from '../actions';
+import { deleteDocumentAction, removeProjectAction, sendPortalLinkAction } from '../actions';
 import { ProjectEditor } from './ProjectEditor';
+import { UploadDocumentForm } from './UploadDocumentForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +27,7 @@ export default async function PortalProjectAdminPage({
 
   const client = await getClient(project.clientId);
   const tickets = await listAllTicketsForProject(project.id);
+  const documents = await listDocuments(project.id);
   const support = supportState(project.liveAt, project.supportDays);
   const balance = balanceInr(project);
   const awaiting = tickets.filter(
@@ -144,6 +147,50 @@ export default async function PortalProjectAdminPage({
               </Link>
             ))}
           </div>
+        )}
+
+        {/* Documents shared with the client */}
+        <h2 className="m-0 mb-4 font-heading text-[22px] font-bold leading-[1.2] tracking-[-0.025em]">
+          Documents
+        </h2>
+        <div className="mb-4">
+          <UploadDocumentForm projectId={project.id} />
+        </div>
+        {documents.length > 0 ? (
+          <div className="mb-9 border-t-2 border-text">
+            {documents.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-neutral-300 py-3.5"
+              >
+                <a
+                  href={`/dashboard/portal/${project.id}/documents/file/${doc.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="min-w-0 text-[14.5px] font-semibold leading-[1.4] text-text transition-colors hover:text-accent-700"
+                >
+                  {doc.title}
+                  <span className="ml-2 font-normal text-neutral-700">
+                    {doc.filename}
+                  </span>
+                </a>
+                <form action={deleteDocumentAction}>
+                  <input type="hidden" name="id" value={doc.id} />
+                  <input type="hidden" name="project" value={project.id} />
+                  <button
+                    type="submit"
+                    className="border-2 border-neutral-400 px-3 py-2 text-[12.5px] font-medium leading-none text-neutral-800 transition-colors hover:border-accent-700 hover:text-accent-700"
+                  >
+                    Remove
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="m-0 mb-9 text-[14px] leading-[1.6] text-neutral-700">
+            Nothing shared yet.
+          </p>
         )}
 
         <div className="border-t-2 border-text pt-6">

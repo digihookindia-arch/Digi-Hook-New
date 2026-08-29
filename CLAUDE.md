@@ -298,6 +298,37 @@ ticket-plus-first-message).
   (statuses, kinds, labels, caps, validators) so the portal's client components can
   import it; `lib/tickets.ts` re-exports it for server callers — same split as
   `lib/delivery.ts`.
+- **The overview answers the ten-second test** (spec-driven upgrade, 2026-08-29):
+  a Needs-your-attention strip (pending quotes first, then replies waited on, then
+  closing windows), support + complimentary-server countdowns (both are
+  `lib/support.ts` window arithmetic — `server_at`/`server_days` beside
+  `live_at`/`support_days`), a website-status card (`lib/siteHealth.ts`: cached
+  10-min HTTPS check + TLS expiry via node:tls, honest 'unknown' when there is no
+  signal), a GoatCounter traffic panel (`lib/stats.ts`, 1-hour cache, hidden until
+  `stats_code`/`stats_token` are set — reads via `GOATCOUNTER_ORIGIN` through the
+  public `/s/<code>/` mapping because Node's fetch strips a hand-set Host header),
+  and a recent-activity feed distilled from ticket threads.
+- **Tickets carry priority** (client-friendly labels, `parsePriority` fallback to
+  normal), an affected-page URL, and **attachments** — PNG/JPG/WebP/PDF, 5 MB, 3
+  per message, validated *before* anything persists. Files live under
+  `data/uploads/` (gitignored) with metadata-only rows; serving routes re-check the
+  full ownership chain and 404 to the wrong account. `cleanHttpUrl` lives in
+  `lib/ticketRules.ts` (it feeds a Host header — lowercase alnum/hyphen only for
+  `stats_code` via `cleanStatsCode`).
+- **The quote-and-approve loop** on feature requests: `setQuote` (→
+  `waiting_client`, client emailed with an approve link), the client's
+  `approveQuote` is one-way (the `accepted_at` pattern) and drops the ticket back
+  into the awaiting-reply queue as work to schedule; `quote_paid_at` is manual
+  bookkeeping, not a gateway. Approval only ever happens client-side.
+- **Documents tab**: studio shares invoices/scope/handover from
+  `/dashboard/portal/<id>` (`lib/documents.ts`, same allow-list and storage split
+  as attachments); clients read-only.
+- **Renewal reminders**: `/api/cron/reminders` (daily VPS crontab, guarded by
+  `CRON_SECRET` — unset = route plays dead) sends 30/15/7/1-day and at-expiry
+  emails for both windows. One send per band per window end-date
+  (`lib/renewals.ts` + `reminder_log`, end date in the dedupe key so extending a
+  window re-arms the ladder); recorded only after a successful send, so failures
+  retry next day.
 - Excluded from search the same three ways as the dashboard: per-page `noindex`
   metadata, `robots.ts` disallow, absent from the sitemap.
 

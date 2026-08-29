@@ -44,6 +44,7 @@ import {
 } from '@/lib/portalProjects';
 import { shapeStats } from '@/lib/stats';
 import { classifyHealth, sslDaysLeft } from '@/lib/siteHealth';
+import { dueThreshold } from '@/lib/renewals';
 
 let pass = 0;
 let fail = 0;
@@ -236,6 +237,16 @@ check('a 500 is a problem', classifyHealth(500) === 'problem');
 check('no status at all is unknown', classifyHealth(null) === 'unknown');
 check('ssl days floor at zero', sslDaysLeft(0, 86_400_000) === 0);
 check('a cert expiring tomorrow shows 1 day', sslDaysLeft(86_400_000, 0) === 1);
+
+console.log('\n— renewal reminders fire once per band, never a backlog —');
+
+check('more than 30 days out is quiet', dueThreshold(45) === null);
+check('day 30 lands in the 30-day band', dueThreshold(30) === 30);
+check('day 29 still lands in the 30-day band (cron catch-up)', dueThreshold(29) === 30);
+check('day 12 lands in the 15-day band', dueThreshold(12) === 15);
+check('day 7 lands in the 7-day band', dueThreshold(7) === 7);
+check('day 5 lands in the 7-day band, not several at once', dueThreshold(5) === 7);
+check('the final day lands in the 1-day band', dueThreshold(1) === 1);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) process.exitCode = 1;

@@ -197,6 +197,41 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS ticket_attachments_ticket ON ticket_attachments (ticket_id);
 
   /*
+   * Project documents the studio shares with the client - invoices, scope,
+   * agreements, handover papers. Same storage split as attachments: file on
+   * disk under data/uploads, metadata here.
+   */
+  CREATE TABLE IF NOT EXISTS documents (
+    id         TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    filename   TEXT NOT NULL,
+    mime       TEXT NOT NULL,
+    size       INTEGER NOT NULL,
+    path       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS documents_project ON documents (project_id, created_at DESC);
+
+  /*
+   * One row per renewal reminder actually sent, keyed by what it reminded
+   * about: the window's end date is part of the key, so extending a support
+   * or server window naturally re-arms the whole reminder ladder for the
+   * new date. The daily cron checks this before sending - reminders fire
+   * once per band, never per day.
+   */
+  CREATE TABLE IF NOT EXISTS reminder_log (
+    id         TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    kind       TEXT NOT NULL,
+    threshold  INTEGER NOT NULL,
+    ends_on    TEXT NOT NULL,
+    sent_at    TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS reminder_log_key
+    ON reminder_log (project_id, kind, threshold, ends_on);
+
+  /*
    * Every client-facing milestone email we have tried to send. One row per
    * attempt, failures included — a send that threw is exactly what the studio
    * needs to see, and a log that only records successes cannot answer "did

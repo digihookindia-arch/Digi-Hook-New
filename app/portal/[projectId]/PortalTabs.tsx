@@ -16,6 +16,7 @@ export function PortalTabs({ projectId }: { projectId: string }) {
     { href: base, label: 'Overview', exact: true },
     { href: `${base}/tickets`, label: 'Support tickets', exact: false },
     { href: `${base}/features`, label: 'Feature requests', exact: false },
+    { href: `${base}/documents`, label: 'Documents', exact: false },
   ];
 
   return (

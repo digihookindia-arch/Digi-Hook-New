@@ -14,6 +14,7 @@ import {
   getProject,
   updateProjectDetails,
 } from '@/lib/portalProjects';
+import { deleteDocument, saveDocument } from '@/lib/documents';
 import { portalInviteEmail } from '@/lib/portalEmails';
 import { isEmailConfigured, sendEmail, STUDIO_INBOX } from '@/lib/email';
 import { SITE_URL } from '@/lib/site';
@@ -150,6 +151,47 @@ export async function sendPortalLinkAction(formData: FormData): Promise<void> {
     console.error('[portal] set-password link email failed', err);
   }
   if (projectId) revalidatePath(`/dashboard/portal/${projectId}`);
+}
+
+export type DocumentState = { error?: string; savedAt?: string };
+
+/** Shares a document with the client — it appears on their Documents tab. */
+export async function uploadDocumentAction(
+  _prev: DocumentState,
+  formData: FormData
+): Promise<DocumentState> {
+  await requireSession();
+
+  const projectId = String(formData.get('project') ?? '');
+  const project = projectId ? await getProject(projectId) : null;
+  if (!project) return { error: 'That project no longer exists.' };
+
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: 'Choose a file to share.' };
+  }
+
+  const { problem } = await saveDocument(
+    project.id,
+    String(formData.get('title') ?? ''),
+    file
+  );
+  if (problem) return { error: problem };
+
+  revalidatePath(`/dashboard/portal/${project.id}`);
+  revalidatePath(`/portal/${project.id}/documents`);
+  return { savedAt: new Date().toISOString() };
+}
+
+export async function deleteDocumentAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const id = String(formData.get('id') ?? '');
+  const projectId = String(formData.get('project') ?? '');
+  if (id) await deleteDocument(id);
+  if (projectId) {
+    revalidatePath(`/dashboard/portal/${projectId}`);
+    revalidatePath(`/portal/${projectId}/documents`);
+  }
 }
 
 export async function removeProjectAction(formData: FormData): Promise<void> {

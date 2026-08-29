@@ -231,6 +231,70 @@ export function quoteSentEmail(input: {
 }
 
 /* ------------------------------------------------------------------ */
+/* Renewal reminders                                                   */
+/* ------------------------------------------------------------------ */
+
+export function renewalReminderEmail(input: {
+  name: string;
+  businessName: string;
+  kind: 'support' | 'server';
+  /** 0 means the window has ended. */
+  daysLeft: number;
+  endsOn: string;
+  portalUrl: string;
+}): PortalMail {
+  const what = input.kind === 'support' ? 'free support plan' : 'complimentary server';
+  const ended = input.daysLeft <= 0;
+  const when = ended
+    ? 'has ended'
+    : `ends in ${input.daysLeft} ${input.daysLeft === 1 ? 'day' : 'days'}`;
+  const endDate = new Date(input.endsOn).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const next =
+    input.kind === 'support'
+      ? 'Our annual maintenance plan keeps bug fixes, updates and monitoring covered — reply or call and we will send the options.'
+      : 'A server renewal keeps your website hosted without interruption — reply or call and we will send the renewal options.';
+
+  return {
+    subject: ended
+      ? `Your ${what} has ended — ${input.businessName}`
+      : `Your ${what} ${when} — ${input.businessName}`,
+    body: [
+      `Hi ${firstName(input.name)},`,
+      '',
+      `The ${what} on ${input.businessName} ${when}${ended ? ` (it ran until ${endDate})` : ` — on ${endDate}`}.`,
+      '',
+      next,
+      '',
+      `See where everything stands: ${input.portalUrl}`,
+      ...signOff(),
+    ].join('\n'),
+    html: milestoneEmailHtml({
+      preheader: ended
+        ? `The ${what} on your project has ended. Here is what renewal looks like.`
+        : `The ${what} on your project ${when}. No surprises — here is what happens next.`,
+      kicker: 'Renewal',
+      headline: ended
+        ? 'A coverage window<br>has ended.'
+        : 'A coverage window<br>is closing soon.',
+      leadHeading: ended ? `Your ${what} has ended.` : `Your ${what} ${when}.`,
+      leadBody: `${input.businessName}: the window ${ended ? 'ran' : 'runs'} until ${endDate}. ${next}`,
+      detailLeftLabel: input.kind === 'support' ? 'Support plan' : 'Server',
+      detailLeftValue: ended ? 'Ended' : `${input.daysLeft} ${input.daysLeft === 1 ? 'day' : 'days'} left`,
+      detailRightLabel: ended ? 'Ran until' : 'Ends on',
+      detailRightValue: endDate,
+      ctaText: 'Open your portal',
+      ctaHref: input.portalUrl,
+      secondaryLine: contactLine(),
+      footerNote: PORTAL_FOOTER,
+    }),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Studio replied                                                      */
 /* ------------------------------------------------------------------ */
 
