@@ -210,6 +210,8 @@ check('a missing total falls back to the daily sum',
   shapeStats({ stats: [{ daily: 2 }, { daily: 5 }] }, 'a', 'b')?.pageviews === 7);
 check('a malformed payload is null', shapeStats({ nope: true }, 'a', 'b') === null);
 check('a null payload is null', shapeStats(null, 'a', 'b') === null);
+check('the cap trims the extra boundary day off the sparkline',
+  JSON.stringify(shapeStats({ stats: [{ daily: 4 }, { daily: 2 }, { daily: 0 }] }, 'a', 'b', 2)?.daily) === '[4,2]');
 
 console.log('\n— the status card never alarms without a signal —');
 

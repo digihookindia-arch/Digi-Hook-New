@@ -36,16 +36,26 @@ export type SiteStats = {
  * The pure half: GoatCounter's /api/v0/stats/total payload → panel model,
  * or null when the payload is not what the API documents. Negative or
  * missing day counts read as 0 — a chart must never render below its axis.
+ * `cap` trims trailing entries: the request's end date runs into tomorrow
+ * (GoatCounter reads `end` as midnight, which would drop today), so the
+ * payload can carry one empty extra day the sparkline must not show.
  */
-export function shapeStats(payload: unknown, from: string, to: string): SiteStats | null {
+export function shapeStats(
+  payload: unknown,
+  from: string,
+  to: string,
+  cap = Infinity
+): SiteStats | null {
   if (typeof payload !== 'object' || payload === null) return null;
   const stats = (payload as { stats?: unknown }).stats;
   if (!Array.isArray(stats)) return null;
 
-  const daily = stats.map((day) => {
-    const n = Number((day as { daily?: unknown })?.daily);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-  });
+  const daily = stats
+    .map((day) => {
+      const n = Number((day as { daily?: unknown })?.daily);
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    })
+    .slice(0, cap);
 
   const total = Number((payload as { total?: unknown }).total);
   const pageviews = Number.isFinite(total) && total > 0
@@ -83,11 +93,14 @@ export async function fetchSiteStats(
 
   const to = new Date().toISOString().slice(0, 10);
   const from = new Date(Date.now() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
+  // GoatCounter reads `end` as that day's midnight — asking for tomorrow is
+  // what makes today's hits count. shapeStats caps the extra day back off.
+  const end = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
 
   let stats: SiteStats | null = null;
   try {
     const res = await fetch(
-      `${ORIGIN}/s/${code}/api/v0/stats/total?start=${from}&end=${to}`,
+      `${ORIGIN}/s/${code}/api/v0/stats/total?start=${from}&end=${end}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -96,7 +109,7 @@ export async function fetchSiteStats(
         signal: AbortSignal.timeout(8000),
       }
     );
-    if (res.ok) stats = shapeStats(await res.json(), from, to);
+    if (res.ok) stats = shapeStats(await res.json(), from, to, days);
     else console.error('[stats] GoatCounter answered', res.status, 'for site', code);
   } catch (err) {
     console.error('[stats] GoatCounter unreachable', err);
