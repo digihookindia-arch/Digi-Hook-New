@@ -295,6 +295,49 @@ export function renewalReminderEmail(input: {
 }
 
 /* ------------------------------------------------------------------ */
+/* Monthly SEO report published                                        */
+/* ------------------------------------------------------------------ */
+
+export function seoReportEmail(input: {
+  name: string;
+  businessName: string;
+  /** e.g. "March 2026", from monthLabel(). */
+  monthLabel: string;
+  /** Full portal URL of the published report. */
+  reportUrl: string;
+}): PortalMail {
+  return {
+    subject: `Your SEO report for ${input.monthLabel} — ${input.businessName}`,
+    body: [
+      `Hi ${firstName(input.name)},`,
+      '',
+      `Your monthly SEO report for ${input.businessName} — ${input.monthLabel} — is ready on your portal.`,
+      '',
+      'It covers what Google recorded for your site, the technical checks we ran, and the work we did with the reasoning behind it.',
+      '',
+      `Read it here: ${input.reportUrl}`,
+      ...signOff(),
+    ].join('\n'),
+    html: milestoneEmailHtml({
+      preheader: `Your ${input.monthLabel} SEO report is ready — the numbers, the work, and why.`,
+      kicker: 'Monthly report',
+      headline: 'Your SEO report<br>is ready to<br>read.',
+      leadHeading: `${input.monthLabel}, in the open.`,
+      leadBody:
+        'What Google recorded for your site, the technical checks we ran, and the work we did with the reasoning behind it — all on your portal, kept on record.',
+      detailLeftLabel: 'Report for',
+      detailLeftValue: input.monthLabel,
+      detailRightLabel: 'Project',
+      detailRightValue: input.businessName,
+      ctaText: 'Read your report',
+      ctaHref: input.reportUrl,
+      secondaryLine: contactLine(),
+      footerNote: PORTAL_FOOTER,
+    }),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Studio replied                                                      */
 /* ------------------------------------------------------------------ */
 

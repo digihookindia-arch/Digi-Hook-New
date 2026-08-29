@@ -4,6 +4,7 @@ import { ArrowRight, Check } from 'lucide-react';
 import { portalProject } from '../../actions';
 import { SearchPerformancePanel } from './SearchPerformancePanel';
 import { AuditReportPanel } from './AuditReportPanel';
+import { ActivityPanel, DeliverablesPanel, ReportsPanel } from './WorkPanels';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,9 @@ export default async function SeoTabPage({
     <div className="grid gap-6">
       <SearchPerformancePanel project={project} />
       <AuditReportPanel project={project} />
+      <DeliverablesPanel project={project} />
+      <ActivityPanel project={project} />
+      <ReportsPanel project={project} />
       <p className="m-0 text-[13px] leading-[1.6] text-neutral-700">
         One promise we never make is a guaranteed position — nobody can
         honestly make it. What you see here is the same data Google shows us,

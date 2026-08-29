@@ -4,6 +4,8 @@ import { ArrowRight } from 'lucide-react';
 import { supportState } from '@/lib/support';
 import { formatInr } from '@/lib/delivery';
 import { listAllTicketsForProject, recentActivityForProject } from '@/lib/tickets';
+import { listWaitingDeliverables } from '@/lib/seoRecords';
+import { waitingDays } from '@/lib/seoWork';
 import { portalProject } from '../actions';
 import { SupportPlanPanel } from './SupportPlanPanel';
 import { ServerPlanPanel } from './ServerPlanPanel';
@@ -34,9 +36,10 @@ export default async function PortalOverviewPage({
   const { projectId } = await params;
   const { project } = await portalProject(projectId);
 
-  const [tickets, activity] = await Promise.all([
+  const [tickets, activity, waitingDeliverables] = await Promise.all([
     listAllTicketsForProject(project.id),
     recentActivityForProject(project.id),
+    project.seoActive ? listWaitingDeliverables(project.id) : Promise.resolve([]),
   ]);
 
   // "Is any action required from me?" — collected in one strip up top.
@@ -54,6 +57,13 @@ export default async function PortalOverviewPage({
         href: `/portal/${project.id}/tickets/${ticket.id}`,
       });
     }
+  }
+  for (const deliverable of waitingDeliverables) {
+    const waiting = waitingDays(deliverable.waitingSince);
+    actions.push({
+      text: `An SEO deliverable is waiting on you${waiting !== null && waiting > 0 ? ` (${waiting} ${waiting === 1 ? 'day' : 'days'} now)` : ''} — "${deliverable.title}"`,
+      href: `/portal/${project.id}/seo`,
+    });
   }
   const support = supportState(project.liveAt, project.supportDays);
   if (support.state === 'active' && support.daysLeft <= 30) {

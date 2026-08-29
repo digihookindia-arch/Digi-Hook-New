@@ -112,6 +112,25 @@ export async function latestAudit(projectId: string): Promise<AuditRun | null> {
   return latest ?? null;
 }
 
+/**
+ * The newest finished run started before a cutoff — how the monthly report
+ * finds "the site as of the month's end" and "the baseline before the month
+ * began" for its resolved/new delta.
+ */
+export async function latestDoneAuditBefore(
+  projectId: string,
+  cutoffIso: string
+): Promise<AuditRun | null> {
+  const row = getDb()
+    .prepare(
+      `SELECT * FROM seo_audits
+        WHERE project_id = ? AND status = 'done' AND started_at < ?
+        ORDER BY started_at DESC LIMIT 1`
+    )
+    .get(projectId, cutoffIso) as Row | undefined;
+  return row ? toRun(row) : null;
+}
+
 /* ── the crawl ─────────────────────────────────────────────────────────── */
 
 /** Content types not worth downloading — the status alone is the finding. */

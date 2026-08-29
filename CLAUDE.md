@@ -110,7 +110,7 @@ design system). Read the relevant block there before changing a page's markup.
 | `app/` | 16 public routes + `sitemap.ts` / `robots.ts` / `opengraph-image.tsx` per segment; `dashboard/`, `proposals/`, `portal/` |
 | `content/` | All copy as typed modules. Edit copy here, never in JSX. |
 | `components/` | Shared chrome + `ServicePage` / `DeepPage` / `PageHero` / `Accordion` / `CtaBand` / `ArticleLayout` |
-| `lib/` | `site.ts` (company facts), `seo.ts`, `jsonld.tsx`, `og.tsx`, `enquiry.ts`, `enquiries.ts`, `proposals.ts`, `db.ts`, `email.ts`, `auth.ts`, `claude.ts`, `clients.ts`, `portalProjects.ts`, `support.ts`, `tickets.ts` / `ticketRules.ts`, `portalEmails.ts`, `seoAudit.ts` / `seoAudits.ts`, `searchConsole.ts` |
+| `lib/` | `site.ts` (company facts), `seo.ts`, `jsonld.tsx`, `og.tsx`, `enquiry.ts`, `enquiries.ts`, `proposals.ts`, `db.ts`, `email.ts`, `auth.ts`, `claude.ts`, `clients.ts`, `portalProjects.ts`, `support.ts`, `tickets.ts` / `ticketRules.ts`, `portalEmails.ts`, `seoAudit.ts` / `seoAudits.ts`, `searchConsole.ts`, `seoWork.ts` / `seoRecords.ts` |
 | `scripts/` | `seo-check.mjs` — the crawler behind `npm run seo` |
 
 Shared page layouts exist — check `components/` before hand-rolling new page markup.
@@ -359,6 +359,26 @@ ticket-plus-first-message).
     stack a second crawl, and a `running` row older than 2h is settled to
     `failed` on read (in the DB, not just the view, or the guard would block
     every later audit).
+  - **SEO-2 work record** — activity log, deliverables, monthly reports:
+    `lib/seoWork.ts` (pure rules) + `lib/seoRecords.ts` (storage), managed
+    from `/dashboard/portal/<id>/seo`. The activity validator **refuses
+    vague entries** (work ≥ 20 chars, reason ≥ 12 — "On-page SEO completed"
+    is the exact entry it exists to block); the result field may be filled
+    in later, results often lag the work. Deliverables stamp
+    `waiting_since` on entering `waiting_client` and clear it on leaving —
+    pending-approval duration is derived from that one timestamp, and the
+    portal overview's attention strip surfaces waiting deliverables.
+    Monthly reports **freeze a data snapshot at generation** (Search
+    Console calendar month + prior month via `fetchMonthSearch`, the latest
+    audit ≤ month end with a delta against the last pre-month run, the
+    month's activities and deliverables); `search: null` means Google was
+    unreadable and the report says so — never zeros. One report per
+    project+month; regenerating refreshes only the data and keeps the
+    studio's words; **publish is one-way and published reports are
+    immutable** (delete is the sole escape hatch). Publishing saves the
+    on-screen text first, refuses a summary under 40 chars
+    (`publishProblem`), then emails the client best-effort. Clients see
+    published reports only — drafts 404.
 - **Renewal reminders**: `/api/cron/reminders` (daily VPS crontab, guarded by
   `CRON_SECRET` — unset = route plays dead) sends 30/15/7/1-day and at-expiry
   emails for both windows. One send per band per window end-date

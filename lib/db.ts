@@ -161,6 +161,65 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS seo_audits_project ON seo_audits (project_id, started_at DESC);
 
   /*
+   * The client-visible SEO work log. Every row is one concrete piece of
+   * work with its reason and (once observable) its result - the no-vague-
+   * entries rule is enforced by the validator in lib/seoWork.ts, not here.
+   * happened_on is the studio-stated work date; created_at is bookkeeping.
+   */
+  CREATE TABLE IF NOT EXISTS seo_activities (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    category    TEXT NOT NULL DEFAULT 'other',
+    work        TEXT NOT NULL,
+    reason      TEXT NOT NULL,
+    evidence    TEXT NOT NULL DEFAULT '',
+    result      TEXT NOT NULL DEFAULT '',
+    happened_on TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS seo_activities_project
+    ON seo_activities (project_id, happened_on DESC, created_at DESC);
+
+  /*
+   * Agreed SEO deliverables and where each stands. waiting_since is stamped
+   * when a deliverable flips to waiting_client and cleared when it leaves,
+   * so the portal can show how long an approval has been pending - the
+   * duration is derived at read time from this one timestamp.
+   */
+  CREATE TABLE IF NOT EXISTS seo_deliverables (
+    id            TEXT PRIMARY KEY,
+    project_id    TEXT NOT NULL,
+    title         TEXT NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'planned',
+    waiting_since TEXT,
+    done_at       TEXT,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS seo_deliverables_project
+    ON seo_deliverables (project_id, created_at);
+
+  /*
+   * Monthly SEO reports. data is the frozen snapshot assembled at
+   * generation (lib/seoWork.ts SeoReportData) - a report records what was
+   * known then, so live numbers must never repaint it. One report per
+   * project per month; publishing is one-way (the accepted_at pattern) and
+   * a published report is immutable - delete is the only escape hatch.
+   */
+  CREATE TABLE IF NOT EXISTS seo_reports (
+    id           TEXT PRIMARY KEY,
+    project_id   TEXT NOT NULL,
+    month        TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'draft',
+    summary      TEXT NOT NULL DEFAULT '',
+    priorities   TEXT NOT NULL DEFAULT '',
+    data         TEXT NOT NULL DEFAULT '{}',
+    generated_at TEXT NOT NULL,
+    published_at TEXT
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS seo_reports_month ON seo_reports (project_id, month);
+
+  /*
    * Support tickets and feature requests raised from the portal. kind
    * separates the two tabs. out_of_support is stamped at creation from the
    * project's support window - editing the live date later must not rewrite

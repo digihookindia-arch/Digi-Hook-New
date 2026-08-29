@@ -17,6 +17,28 @@ import {
 } from '@/lib/portalProjects';
 import { deleteDocument, saveDocument } from '@/lib/documents';
 import { runAudit } from '@/lib/seoAudits';
+import {
+  cleanActivity,
+  currentMonthKey,
+  isMonthKey,
+  monthLabel,
+  parseDeliverableStatus,
+  publishProblem,
+} from '@/lib/seoWork';
+import {
+  addActivity,
+  addDeliverable,
+  deleteActivity,
+  deleteDeliverable,
+  deleteReport,
+  generateReport,
+  getReport,
+  publishReport,
+  saveReportText,
+  setActivityResult,
+  setDeliverableStatus,
+} from '@/lib/seoRecords';
+import { seoReportEmail } from '@/lib/portalEmails';
 import { portalInviteEmail } from '@/lib/portalEmails';
 import { isEmailConfigured, sendEmail, STUDIO_INBOX } from '@/lib/email';
 import { SITE_URL } from '@/lib/site';
@@ -226,4 +248,174 @@ export async function removeProjectAction(formData: FormData): Promise<void> {
   if (id) await deleteProject(id);
   revalidatePath('/dashboard/portal');
   redirect('/dashboard/portal');
+}
+
+/* ── SEO work record (activity log · deliverables · monthly reports) ──── */
+
+/** Both surfaces that show the record — refresh together after any change. */
+function revalidateSeo(projectId: string): void {
+  revalidatePath(`/dashboard/portal/${projectId}/seo`);
+  revalidatePath(`/portal/${projectId}/seo`);
+}
+
+export async function addSeoActivityAction(
+  _prev: PortalAdminState,
+  formData: FormData
+): Promise<PortalAdminState> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const project = projectId ? await getProject(projectId) : null;
+  if (!project) return { error: 'That project no longer exists.' };
+
+  const cleaned = cleanActivity({
+    category: formData.get('category'),
+    work: formData.get('work'),
+    reason: formData.get('reason'),
+    evidence: formData.get('evidence'),
+    result: formData.get('result'),
+    happenedOn: formData.get('happened_on'),
+  });
+  if ('error' in cleaned) return { error: cleaned.error };
+
+  await addActivity(project.id, cleaned.activity);
+  revalidateSeo(project.id);
+  return { savedAt: new Date().toISOString() };
+}
+
+export async function setActivityResultAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const id = String(formData.get('id') ?? '');
+  if (id && projectId) {
+    await setActivityResult(id, projectId, String(formData.get('result') ?? ''));
+    revalidateSeo(projectId);
+  }
+}
+
+export async function deleteSeoActivityAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const id = String(formData.get('id') ?? '');
+  if (id && projectId) {
+    await deleteActivity(id, projectId);
+    revalidateSeo(projectId);
+  }
+}
+
+export async function addSeoDeliverableAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const project = projectId ? await getProject(projectId) : null;
+  if (!project) return;
+  await addDeliverable(project.id, String(formData.get('title') ?? ''));
+  revalidateSeo(project.id);
+}
+
+export async function setDeliverableStatusAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const id = String(formData.get('id') ?? '');
+  const status = parseDeliverableStatus(formData.get('status'));
+  if (id && projectId && status) {
+    await setDeliverableStatus(id, projectId, status);
+    revalidateSeo(projectId);
+    revalidatePath(`/portal/${projectId}`); // the overview's attention strip
+  }
+}
+
+export async function deleteSeoDeliverableAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const id = String(formData.get('id') ?? '');
+  if (id && projectId) {
+    await deleteDeliverable(id, projectId);
+    revalidateSeo(projectId);
+  }
+}
+
+export async function generateSeoReportAction(
+  _prev: PortalAdminState,
+  formData: FormData
+): Promise<PortalAdminState> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const project = projectId ? await getProject(projectId) : null;
+  if (!project) return { error: 'That project no longer exists.' };
+
+  const month = String(formData.get('month') ?? '').trim();
+  if (!isMonthKey(month)) return { error: 'Pick a month.' };
+  if (month > currentMonthKey()) return { error: 'That month has not happened yet.' };
+
+  const outcome = await generateReport(project, month);
+  if ('error' in outcome) return { error: outcome.error };
+
+  revalidateSeo(project.id);
+  return { savedAt: outcome.report.generatedAt };
+}
+
+/**
+ * One action for the draft editor's two buttons. `intent=save` persists the
+ * studio's words; `intent=publish` persists them first, then publishes —
+ * so what goes out is always exactly what is on screen — and emails the
+ * client best-effort. Publishing a hollow report is refused.
+ */
+export async function saveSeoReportAction(
+  _prev: PortalAdminState,
+  formData: FormData
+): Promise<PortalAdminState> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const id = String(formData.get('id') ?? '');
+  const project = projectId ? await getProject(projectId) : null;
+  const report = project && id ? await getReport(id, project.id) : null;
+  if (!project || !report) return { error: 'That report no longer exists.' };
+  if (report.status === 'published') {
+    return { error: 'Published reports never change.' };
+  }
+
+  const summary = String(formData.get('summary') ?? '');
+  const priorities = String(formData.get('priorities') ?? '');
+  await saveReportText(report.id, project.id, summary, priorities);
+
+  if (String(formData.get('intent') ?? '') !== 'publish') {
+    revalidateSeo(project.id);
+    return { savedAt: new Date().toISOString() };
+  }
+
+  const problem = publishProblem({ summary });
+  if (problem) return { error: problem };
+  const published = await publishReport(report.id, project.id);
+  if (!published) return { error: 'That report is not a draft any more.' };
+
+  const client = await getClient(project.clientId);
+  if (client?.email) {
+    try {
+      await sendEmail({
+        to: client.email,
+        replyTo: STUDIO_INBOX,
+        ...seoReportEmail({
+          name: client.name,
+          businessName: project.businessName,
+          monthLabel: monthLabel(report.month),
+          reportUrl: `${SITE_URL}/portal/${project.id}/seo/reports/${report.id}`,
+        }),
+      });
+    } catch (err) {
+      console.error('[seo] report published, but the client email failed', err);
+    }
+  }
+
+  revalidateSeo(project.id);
+  revalidatePath(`/portal/${project.id}/seo/reports/${report.id}`);
+  return { savedAt: new Date().toISOString() };
+}
+
+export async function deleteSeoReportAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const id = String(formData.get('id') ?? '');
+  if (id && projectId) {
+    await deleteReport(id, projectId);
+    revalidateSeo(projectId);
+  }
 }

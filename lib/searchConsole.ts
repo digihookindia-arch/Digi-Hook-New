@@ -137,6 +137,9 @@ declare global {
   // Survives module re-evaluation in dev, same trick as the db handle.
   var _dhGscToken: { token: string; expiresAt: number } | undefined;
   var _dhGscCache: Map<string, { at: number; data: SearchPerformance | null }> | undefined;
+  var _dhGscMonthCache:
+    | Map<string, { at: number; data: SearchWindowData | null }>
+    | undefined;
 }
 
 function readServiceKey(): ServiceKey | null {
@@ -248,11 +251,55 @@ async function queryRows(
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
+export type SearchWindowData = {
+  totals: SearchTotals | null;
+  previousTotals: SearchTotals | null;
+  topQueries: SearchRow[];
+  topPages: SearchRow[];
+  pagesInSearch: number;
+};
+
 /**
- * The whole panel's data for one property, or null when any part failed —
- * a half-real report is worse than an honest "unavailable". Cached
- * in-process for an hour; portal pages are force-dynamic and must not spend
- * four API calls per render.
+ * The four queries every reading needs — window totals, the comparison
+ * window, top queries and top pages. All four must succeed or the whole
+ * reading is null: a half-real report is worse than an honest "unavailable".
+ */
+async function fetchWindowData(
+  token: string,
+  property: string,
+  window: { from: string; to: string; prevFrom: string; prevTo: string }
+): Promise<SearchWindowData | null> {
+  const [totals, previous, queries, pages] = await Promise.all([
+    queryRows(token, property, { startDate: window.from, endDate: window.to }),
+    queryRows(token, property, { startDate: window.prevFrom, endDate: window.prevTo }),
+    queryRows(token, property, {
+      startDate: window.from,
+      endDate: window.to,
+      dimensions: ['query'],
+      rowLimit: 10,
+    }),
+    queryRows(token, property, {
+      startDate: window.from,
+      endDate: window.to,
+      dimensions: ['page'],
+      rowLimit: 1000,
+    }),
+  ]);
+
+  if (totals === null || previous === null || queries === null || pages === null) return null;
+  return {
+    totals: totals[0] ?? null,
+    previousTotals: previous[0] ?? null,
+    topQueries: queries,
+    topPages: pages.slice(0, 10),
+    pagesInSearch: pages.length,
+  };
+}
+
+/**
+ * The live panel's data for one property, or null when anything failed.
+ * Cached in-process for an hour; portal pages are force-dynamic and must
+ * not spend four API calls per render.
  */
 export async function fetchSearchPerformance(
   property: string
@@ -268,36 +315,40 @@ export async function fetchSearchPerformance(
 
   const token = await accessToken();
   if (token) {
-    const [totals, previous, queries, pages] = await Promise.all([
-      queryRows(token, property, { startDate: window.from, endDate: window.to }),
-      queryRows(token, property, { startDate: window.prevFrom, endDate: window.prevTo }),
-      queryRows(token, property, {
-        startDate: window.from,
-        endDate: window.to,
-        dimensions: ['query'],
-        rowLimit: 10,
-      }),
-      queryRows(token, property, {
-        startDate: window.from,
-        endDate: window.to,
-        dimensions: ['page'],
-        rowLimit: 1000,
-      }),
-    ]);
-
-    if (totals !== null && previous !== null && queries !== null && pages !== null) {
+    const windowData = await fetchWindowData(token, property, window);
+    if (windowData) {
       data = {
         period: { from: window.from, to: window.to },
         fetchedAt: new Date().toISOString(),
-        totals: totals[0] ?? null,
-        previousTotals: previous[0] ?? null,
-        topQueries: queries,
-        topPages: pages.slice(0, 10),
-        pagesInSearch: pages.length,
+        ...windowData,
       };
     }
   }
 
   cache.set(property, { at: Date.now(), data });
+  return data;
+}
+
+/**
+ * One calendar month for the monthly report, with the month before as the
+ * comparison. The caller supplies the bounds (lib/seoWork.ts owns the month
+ * arithmetic); null on any failure, and the report then says "not readable
+ * at generation" rather than storing zeros. Cached like the live window —
+ * regenerating a draft twice in an hour should not double the API spend.
+ */
+export async function fetchMonthSearch(
+  property: string,
+  bounds: { from: string; to: string; prevFrom: string; prevTo: string }
+): Promise<SearchWindowData | null> {
+  if (!isSearchConsoleConfigured() || !property) return null;
+
+  const cache = (global._dhGscMonthCache ??= new Map());
+  const key = `${property}:${bounds.from}:${bounds.to}`;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.data;
+
+  const token = await accessToken();
+  const data = token ? await fetchWindowData(token, property, bounds) : null;
+  cache.set(key, { at: Date.now(), data });
   return data;
 }

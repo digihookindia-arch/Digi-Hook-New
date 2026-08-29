@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ExternalLink, Play, Send, Trash2 } from 'lucide-react';
+import { ArrowRight, ExternalLink, Send, Trash2 } from 'lucide-react';
 import { getProject, balanceInr } from '@/lib/portalProjects';
 import { getClient, isActivated } from '@/lib/clients';
 import { supportState } from '@/lib/support';
@@ -8,12 +8,10 @@ import { listAllTicketsForProject, TICKET_KIND_LABELS, TICKET_STATUS_LABELS } fr
 import { formatInr } from '@/lib/delivery';
 import { listDocuments } from '@/lib/documents';
 import { latestAudit } from '@/lib/seoAudits';
-import { isSearchConsoleConfigured } from '@/lib/searchConsole';
 import { requireSession } from '../../actions';
 import {
   deleteDocumentAction,
   removeProjectAction,
-  runSeoAuditAction,
   sendPortalLinkAction,
 } from '../actions';
 import { ProjectEditor } from './ProjectEditor';
@@ -201,7 +199,7 @@ export default async function PortalProjectAdminPage({
           </p>
         )}
 
-        {/* SEO & Growth — what the workspace is currently able to show */}
+        {/* SEO & Growth — headline state; the workbench is its own page */}
         <h2 className="m-0 mb-4 font-heading text-[22px] font-bold leading-[1.2] tracking-[-0.025em]">
           SEO &amp; Growth
         </h2>
@@ -211,43 +209,24 @@ export default async function PortalProjectAdminPage({
             in the project details above.
           </p>
         ) : (
-          <div className="mb-9 border-2 border-text p-6">
-            <div className="mb-4 grid gap-2 text-[14.5px] leading-[1.6]">
-              <div>
-                <span className="font-semibold">Search Console:</span>{' '}
-                {!isSearchConsoleConfigured()
-                  ? 'GSC_KEY_FILE is not set on the server — the search panel shows "being connected".'
-                  : project.gscProperty
-                    ? `reading ${project.gscProperty} (make sure the service account is a user on that property).`
-                    : 'no property set — add it in the project details above.'}
-              </div>
-              <div>
-                <span className="font-semibold">Site audit:</span>{' '}
-                {!audit
-                  ? 'none yet.'
-                  : audit.status === 'running'
-                    ? `running since ${new Date(audit.startedAt).toLocaleString('en-IN')} — refresh in a minute.`
-                    : audit.status === 'failed'
-                      ? `last attempt failed (${new Date(audit.startedAt).toLocaleDateString('en-IN')}) — check the server log.`
-                      : `${new Date(audit.startedAt).toLocaleDateString('en-IN')} · ${audit.pages} pages · ${audit.errors} critical, ${audit.warnings} warnings, ${audit.notices} notices.`}
-              </div>
+          <div className="mb-9 flex flex-wrap items-center justify-between gap-4 border-2 border-text p-6">
+            <div className="min-w-0 flex-[1_1_320px] text-[14.5px] leading-[1.6]">
+              <span className="font-semibold">Last audit:</span>{' '}
+              {!audit
+                ? 'none yet.'
+                : audit.status === 'running'
+                  ? 'running now.'
+                  : audit.status === 'failed'
+                    ? 'failed — see the SEO page.'
+                    : `${new Date(audit.startedAt).toLocaleDateString('en-IN')} · ${audit.pages} pages · ${audit.errors} critical, ${audit.warnings} warnings, ${audit.notices} notices.`}
             </div>
-            {project.siteUrl ? (
-              <form action={runSeoAuditAction}>
-                <input type="hidden" name="project" value={project.id} />
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
-                >
-                  <Play size={14} aria-hidden="true" />
-                  Run audit now
-                </button>
-              </form>
-            ) : (
-              <p className="m-0 text-[13.5px] leading-[1.6] text-neutral-700">
-                Set the live site URL above to enable audits.
-              </p>
-            )}
+            <Link
+              href={`/dashboard/portal/${project.id}/seo`}
+              className="inline-flex items-center gap-2 border-2 border-accent-600 bg-accent-600 px-4 py-3 text-[14px] font-semibold leading-none text-white transition-colors hover:border-accent-700 hover:bg-accent-700"
+            >
+              Manage SEO
+              <ArrowRight size={14} aria-hidden="true" />
+            </Link>
           </div>
         )}
 
