@@ -130,14 +130,37 @@ export function ProjectEditor({ project }: { project: PortalProject }) {
             className={inputClass}
           />
         </label>
+        <label className="block">
+          <span className={labelClass}>Search Console property</span>
+          <input
+            name="gsc_property"
+            type="text"
+            placeholder="sc-domain:client-site.in"
+            defaultValue={project.gscProperty ?? ''}
+            className={inputClass}
+          />
+        </label>
       </div>
+
+      <label className="mt-4 flex w-fit cursor-pointer items-center gap-3 border-2 border-neutral-400 px-4 py-3 text-[14px] font-medium leading-none">
+        <input
+          type="checkbox"
+          name="seo_active"
+          defaultChecked={project.seoActive}
+          className="h-4 w-4 accent-accent-600"
+        />
+        Ongoing SEO subscription
+      </label>
 
       <p className="m-0 mt-3 text-[12.5px] leading-[1.55] text-neutral-700">
         The support countdown starts on the live date; the server countdown on
         the server start date. Leave the total empty and the client sees no
         payments panel. Site URL turns on the website-status card; stats code
         + token (lowercase letters, digits, hyphens — see the GoatCounter
-        runbook) turn on the traffic panel.
+        runbook) turn on the traffic panel. The SEO subscription flips the
+        client&apos;s SEO &amp; Growth tab from locked preview to workspace;
+        the Search Console property (sc-domain: or URL form) feeds its search
+        panel once our service account has access to it.
       </p>
 
       {state.error ? (

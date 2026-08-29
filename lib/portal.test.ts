@@ -160,7 +160,8 @@ console.log('\n— the payment summary never shows a negative balance —');
 const project = (totalInr: number | null, paidInr: number): PortalProject => ({
   id: 'p', clientId: 'c', businessName: 'B', liveAt: null, supportDays: 180,
   totalInr, paidInr, siteUrl: null, serverAt: null, serverDays: 365,
-  statsCode: null, statsToken: null, createdAt: '', updatedAt: '',
+  statsCode: null, statsToken: null, seoActive: false, gscProperty: null,
+  createdAt: '', updatedAt: '',
 });
 check('no total means no balance', balanceInr(project(null, 500)) === null);
 check('balance is total minus paid', balanceInr(project(100000, 20000)) === 80000);

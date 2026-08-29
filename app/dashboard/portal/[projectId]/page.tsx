@@ -1,14 +1,21 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ExternalLink, Send, Trash2 } from 'lucide-react';
+import { ExternalLink, Play, Send, Trash2 } from 'lucide-react';
 import { getProject, balanceInr } from '@/lib/portalProjects';
 import { getClient, isActivated } from '@/lib/clients';
 import { supportState } from '@/lib/support';
 import { listAllTicketsForProject, TICKET_KIND_LABELS, TICKET_STATUS_LABELS } from '@/lib/tickets';
 import { formatInr } from '@/lib/delivery';
 import { listDocuments } from '@/lib/documents';
+import { latestAudit } from '@/lib/seoAudits';
+import { isSearchConsoleConfigured } from '@/lib/searchConsole';
 import { requireSession } from '../../actions';
-import { deleteDocumentAction, removeProjectAction, sendPortalLinkAction } from '../actions';
+import {
+  deleteDocumentAction,
+  removeProjectAction,
+  runSeoAuditAction,
+  sendPortalLinkAction,
+} from '../actions';
 import { ProjectEditor } from './ProjectEditor';
 import { UploadDocumentForm } from './UploadDocumentForm';
 
@@ -28,6 +35,7 @@ export default async function PortalProjectAdminPage({
   const client = await getClient(project.clientId);
   const tickets = await listAllTicketsForProject(project.id);
   const documents = await listDocuments(project.id);
+  const audit = project.seoActive ? await latestAudit(project.id) : null;
   const support = supportState(project.liveAt, project.supportDays);
   const balance = balanceInr(project);
   const awaiting = tickets.filter(
@@ -191,6 +199,56 @@ export default async function PortalProjectAdminPage({
           <p className="m-0 mb-9 text-[14px] leading-[1.6] text-neutral-700">
             Nothing shared yet.
           </p>
+        )}
+
+        {/* SEO & Growth — what the workspace is currently able to show */}
+        <h2 className="m-0 mb-4 font-heading text-[22px] font-bold leading-[1.2] tracking-[-0.025em]">
+          SEO &amp; Growth
+        </h2>
+        {!project.seoActive ? (
+          <p className="m-0 mb-9 text-[15px] leading-[1.6] text-neutral-700">
+            Subscription off — the client sees the locked preview. Turn it on
+            in the project details above.
+          </p>
+        ) : (
+          <div className="mb-9 border-2 border-text p-6">
+            <div className="mb-4 grid gap-2 text-[14.5px] leading-[1.6]">
+              <div>
+                <span className="font-semibold">Search Console:</span>{' '}
+                {!isSearchConsoleConfigured()
+                  ? 'GSC_KEY_FILE is not set on the server — the search panel shows "being connected".'
+                  : project.gscProperty
+                    ? `reading ${project.gscProperty} (make sure the service account is a user on that property).`
+                    : 'no property set — add it in the project details above.'}
+              </div>
+              <div>
+                <span className="font-semibold">Site audit:</span>{' '}
+                {!audit
+                  ? 'none yet.'
+                  : audit.status === 'running'
+                    ? `running since ${new Date(audit.startedAt).toLocaleString('en-IN')} — refresh in a minute.`
+                    : audit.status === 'failed'
+                      ? `last attempt failed (${new Date(audit.startedAt).toLocaleDateString('en-IN')}) — check the server log.`
+                      : `${new Date(audit.startedAt).toLocaleDateString('en-IN')} · ${audit.pages} pages · ${audit.errors} critical, ${audit.warnings} warnings, ${audit.notices} notices.`}
+              </div>
+            </div>
+            {project.siteUrl ? (
+              <form action={runSeoAuditAction}>
+                <input type="hidden" name="project" value={project.id} />
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
+                >
+                  <Play size={14} aria-hidden="true" />
+                  Run audit now
+                </button>
+              </form>
+            ) : (
+              <p className="m-0 text-[13.5px] leading-[1.6] text-neutral-700">
+                Set the live site URL above to enable audits.
+              </p>
+            )}
+          </div>
         )}
 
         <div className="border-t-2 border-text pt-6">

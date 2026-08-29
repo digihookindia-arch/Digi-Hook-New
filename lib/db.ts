@@ -132,10 +132,33 @@ const SCHEMA = `
     server_days   INTEGER NOT NULL DEFAULT 365,
     stats_code    TEXT,
     stats_token   TEXT,
+    seo_active    INTEGER NOT NULL DEFAULT 0,
+    gsc_property  TEXT,
     created_at    TEXT NOT NULL,
     updated_at    TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS portal_projects_client ON portal_projects (client_id);
+
+  /*
+   * One row per site-audit run for the SEO workspace, findings as JSON in
+   * summary. Fix states are never stored - new/persistent/resolved is
+   * derived at read time by diffing the two latest runs on issue
+   * fingerprints, so there is no second copy of the truth to rot.
+   */
+  CREATE TABLE IF NOT EXISTS seo_audits (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    site_url    TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'running',
+    started_at  TEXT NOT NULL,
+    finished_at TEXT,
+    pages       INTEGER NOT NULL DEFAULT 0,
+    errors      INTEGER NOT NULL DEFAULT 0,
+    warnings    INTEGER NOT NULL DEFAULT 0,
+    notices     INTEGER NOT NULL DEFAULT 0,
+    summary     TEXT NOT NULL DEFAULT '{}'
+  );
+  CREATE INDEX IF NOT EXISTS seo_audits_project ON seo_audits (project_id, started_at DESC);
 
   /*
    * Support tickets and feature requests raised from the portal. kind
@@ -331,6 +354,11 @@ export function getDb(): DatabaseSync {
     addColumnIfMissing(db, 'tickets', 'quoted_at', 'TEXT');
     addColumnIfMissing(db, 'tickets', 'approved_at', 'TEXT');
     addColumnIfMissing(db, 'tickets', 'quote_paid_at', 'TEXT');
+    // SEO module (SEO-1). The subscription flag flips the portal's SEO tab
+    // from locked preview to workspace; gsc_property names the Search
+    // Console property the workspace reads (sc-domain: or URL-prefix form).
+    addColumnIfMissing(db, 'portal_projects', 'seo_active', 'INTEGER NOT NULL DEFAULT 0');
+    addColumnIfMissing(db, 'portal_projects', 'gsc_property', 'TEXT');
     global._dhSqlite = db;
   }
   return global._dhSqlite;

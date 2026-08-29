@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { createSetPasswordToken } from '@/lib/auth';
 import {
   createOrGetClientByEmail,
@@ -15,6 +16,7 @@ import {
   updateProjectDetails,
 } from '@/lib/portalProjects';
 import { deleteDocument, saveDocument } from '@/lib/documents';
+import { runAudit } from '@/lib/seoAudits';
 import { portalInviteEmail } from '@/lib/portalEmails';
 import { isEmailConfigured, sendEmail, STUDIO_INBOX } from '@/lib/email';
 import { SITE_URL } from '@/lib/site';
@@ -124,13 +126,37 @@ export async function updateProjectAction(
     serverDays: Number(formData.get('server_days') ?? 365),
     statsCode: formData.get('stats_code'),
     statsToken: formData.get('stats_token'),
+    seoActive: formData.get('seo_active') === 'on',
+    gscProperty: formData.get('gsc_property'),
   });
 
   revalidatePath(`/dashboard/portal/${id}`);
   revalidatePath('/dashboard/portal');
   revalidatePath(`/portal/${id}`);
   revalidatePath(`/portal/${id}/tickets`);
+  revalidatePath(`/portal/${id}/seo`);
   return { savedAt: new Date().toISOString() };
+}
+
+/**
+ * Kicks off a site audit for one project without holding the request open —
+ * a 100-page crawl takes a minute or two, and the runner refuses to stack a
+ * second crawl while one is in flight. The page shows the run in progress
+ * on its next render.
+ */
+export async function runSeoAuditAction(formData: FormData): Promise<void> {
+  await requireSession();
+
+  const projectId = String(formData.get('project') ?? '');
+  const project = projectId ? await getProject(projectId) : null;
+  if (!project?.siteUrl) return;
+
+  const { id, siteUrl } = project;
+  after(async () => {
+    await runAudit(id, siteUrl);
+  });
+
+  revalidatePath(`/dashboard/portal/${projectId}`);
 }
 
 /**

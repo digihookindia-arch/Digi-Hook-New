@@ -110,7 +110,7 @@ design system). Read the relevant block there before changing a page's markup.
 | `app/` | 16 public routes + `sitemap.ts` / `robots.ts` / `opengraph-image.tsx` per segment; `dashboard/`, `proposals/`, `portal/` |
 | `content/` | All copy as typed modules. Edit copy here, never in JSX. |
 | `components/` | Shared chrome + `ServicePage` / `DeepPage` / `PageHero` / `Accordion` / `CtaBand` / `ArticleLayout` |
-| `lib/` | `site.ts` (company facts), `seo.ts`, `jsonld.tsx`, `og.tsx`, `enquiry.ts`, `enquiries.ts`, `proposals.ts`, `db.ts`, `email.ts`, `auth.ts`, `claude.ts`, `clients.ts`, `portalProjects.ts`, `support.ts`, `tickets.ts` / `ticketRules.ts`, `portalEmails.ts` |
+| `lib/` | `site.ts` (company facts), `seo.ts`, `jsonld.tsx`, `og.tsx`, `enquiry.ts`, `enquiries.ts`, `proposals.ts`, `db.ts`, `email.ts`, `auth.ts`, `claude.ts`, `clients.ts`, `portalProjects.ts`, `support.ts`, `tickets.ts` / `ticketRules.ts`, `portalEmails.ts`, `seoAudit.ts` / `seoAudits.ts`, `searchConsole.ts` |
 | `scripts/` | `seo-check.mjs` — the crawler behind `npm run seo` |
 
 Shared page layouts exist — check `components/` before hand-rolling new page markup.
@@ -122,9 +122,9 @@ that markup** — a layout fix there must be made twice until it is migrated.
 ### Storage — SQLite, not MongoDB
 
 `lib/db.ts` uses Node's built-in `node:sqlite` (needs Node 24). No dependency, no server,
-one file at `data/digihook.db` (`SQLITE_PATH` overrides; `/data` is gitignored). Seven
+one file at `data/digihook.db` (`SQLITE_PATH` overrides; `/data` is gitignored). Core
 tables: `proposals`, `enquiries`, `quote_leads`, and the portal's `clients` /
-`portal_projects` / `tickets` / `ticket_messages`. **`content/technology.ts` still lists
+`portal_projects` / `tickets` / `ticket_messages` / `seo_audits`. **`content/technology.ts` still lists
 MongoDB — that is marketing copy about the stack offered to clients, not this app.
 Leave it.**
 
@@ -323,6 +323,42 @@ ticket-plus-first-message).
 - **Documents tab**: studio shares invoices/scope/handover from
   `/dashboard/portal/<id>` (`lib/documents.ts`, same allow-list and storage split
   as attachments); clients read-only.
+- **SEO & Growth tab (SEO-1, 2026-08-29)** — always visible, two states:
+  `seo_active` on the project flips it from a truthful locked preview
+  ("SEO-ready foundation; ongoing SEO is a separate growth service" — and
+  **never promise a ranking or a traffic figure, anywhere**) to the workspace.
+  No price appears on the locked page — the commercial call is still open.
+  - **Search Console panel** (`lib/searchConsole.ts`): service-account JWT
+    signed with node:crypto (no SDK), `GSC_KEY_FILE` env points at the JSON
+    key; the account's client_email must be added as a user on each property
+    in Search Console, and the property (sc-domain: or URL-prefix form,
+    trailing slash preserved) lives on the project row. 28-day window ending
+    3 days back (Google's lag) + the prior window for comparison; 1-hour
+    per-property cache. **Missing data is never rendered as zero** — key
+    absent, property unset, 403, malformed payload all show an honest
+    "being connected / unavailable" note; only a genuinely empty result may
+    show real zeros. Every figure names source, period and sync time.
+  - **Site auditor**: `lib/seoAudit.ts` is the pure half (robots parsing,
+    page checks, fingerprints, diffs — the ticketRules/tickets split),
+    `lib/seoAudits.ts` the fetch loop and `seo_audits` storage. Grown from
+    `scripts/seo-check.mjs` but calibrated for other people's HTML: tolerant
+    parsing (any attribute order/quote style) and most findings are warnings,
+    not failures. Honours robots.txt (own-agent group beats `*`, longest
+    match wins, Allow beats Disallow on a tie), caps at 100 pages, strips
+    query strings from discovered links so facets cannot eat the cap, waits
+    350ms between fetches, identifies as `DigiHookAudit/1.0`. **Fix states
+    are never stored** — new/persistent/resolved is diffed at read time from
+    the two latest runs on stable issue fingerprints (`check|path[|extra]`),
+    so keep fingerprints free of anything volatile.
+  - `/api/cron/seo-audit` (weekly crontab, same CRON_SECRET play-dead guard)
+    skips projects audited in the last 5 days, so a daily schedule still
+    yields weekly passes and failures retry. **Point the crontab at
+    127.0.0.1:3001 directly** — a multi-project pass can outlive nginx's
+    proxy timeout. The dashboard's "Run audit now" wraps the crawl in
+    `after()` so the action returns while it runs; `runAudit` refuses to
+    stack a second crawl, and a `running` row older than 2h is settled to
+    `failed` on read (in the DB, not just the view, or the guard would block
+    every later audit).
 - **Renewal reminders**: `/api/cron/reminders` (daily VPS crontab, guarded by
   `CRON_SECRET` — unset = route plays dead) sends 30/15/7/1-day and at-expiry
   emails for both windows. One send per band per window end-date

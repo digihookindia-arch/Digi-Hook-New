@@ -21,7 +21,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx lib/enquiry.test.ts && tsx lib/delivery.test.ts && tsx lib/journey.test.ts && tsx lib/portal.test.ts",
+    "test": "tsx lib/enquiry.test.ts && tsx lib/delivery.test.ts && tsx lib/journey.test.ts && tsx lib/portal.test.ts && tsx lib/seoAudit.test.ts",
     "seo": "node scripts/seo-check.mjs"
   },
   "dependencies": {

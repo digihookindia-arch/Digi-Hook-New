@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { getDb } from './db';
 import { cleanHttpUrl } from './ticketRules';
+import { cleanGscProperty } from './searchConsole';
 
 /**
  * Portal engagements — the page a client sees after logging in. One row per
@@ -28,6 +29,10 @@ export type PortalProject = {
   /** GoatCounter site code + API token. Null code hides the traffic panel. */
   statsCode: string | null;
   statsToken: string | null;
+  /** Ongoing-SEO subscription: flips the SEO tab from locked preview to workspace. */
+  seoActive: boolean;
+  /** Search Console property the workspace reads (sc-domain: or URL-prefix). */
+  gscProperty: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -45,6 +50,8 @@ type Row = {
   server_days: number;
   stats_code: string | null;
   stats_token: string | null;
+  seo_active: number;
+  gsc_property: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -63,6 +70,8 @@ function toProject(row: Row): PortalProject {
     serverDays: row.server_days ?? 365,
     statsCode: row.stats_code ?? null,
     statsToken: row.stats_token ?? null,
+    seoActive: row.seo_active === 1,
+    gscProperty: row.gsc_property ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -102,6 +111,8 @@ export async function createProject(input: {
     serverDays: 365,
     statsCode: null,
     statsToken: null,
+    seoActive: false,
+    gscProperty: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -171,6 +182,8 @@ export async function updateProjectDetails(
     serverDays?: number;
     statsCode?: unknown;
     statsToken?: unknown;
+    seoActive?: boolean;
+    gscProperty?: unknown;
   }
 ): Promise<void> {
   const supportDays = Number.isFinite(input.supportDays)
@@ -194,7 +207,7 @@ export async function updateProjectDetails(
       `UPDATE portal_projects
           SET business_name = ?, live_at = ?, support_days = ?, total_inr = ?, paid_inr = ?,
               site_url = ?, server_at = ?, server_days = ?, stats_code = ?, stats_token = ?,
-              updated_at = ?
+              seo_active = ?, gsc_property = ?, updated_at = ?
         WHERE id = ?`
     )
     .run(
@@ -208,6 +221,8 @@ export async function updateProjectDetails(
       serverDays,
       cleanStatsCode(input.statsCode),
       statsToken,
+      input.seoActive ? 1 : 0,
+      cleanGscProperty(input.gscProperty),
       new Date().toISOString(),
       id
     );

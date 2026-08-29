@@ -17,6 +17,9 @@ export function PortalTabs({ projectId }: { projectId: string }) {
     { href: `${base}/tickets`, label: 'Support tickets', exact: false },
     { href: `${base}/features`, label: 'Feature requests', exact: false },
     { href: `${base}/documents`, label: 'Documents', exact: false },
+    // Always visible by design: subscribers get the workspace, everyone else
+    // a truthful locked preview — the page decides, not the nav.
+    { href: `${base}/seo`, label: 'SEO & Growth', exact: false },
   ];
 
   return (
