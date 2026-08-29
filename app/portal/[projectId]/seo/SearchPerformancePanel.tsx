@@ -5,14 +5,14 @@ import {
 } from '@/lib/searchConsole';
 import type { PortalProject } from '@/lib/portalProjects';
 import { displayDate, pathOf, pct, RowsTable, Stat } from './bits';
+import { Columns, Delta } from './charts';
 
 /**
- * The workspace's Google panel: clicks, impressions, CTR and average
- * position over the last 28 days of finished data, with the previous window
- * alongside, plus top queries and pages. The spec rules live here: every
- * figure names its source, period and sync time — and any gap (not yet
- * connected, Google unreachable, malformed payload) is said plainly instead
- * of being dressed up as zero.
+ * Search performance as an analyst would read it: a KPI row with movement
+ * deltas against the previous 28 days, daily clicks and impressions as two
+ * single-axis column charts (never one dual-axis chart), and the top
+ * query/page tables. Prose is confined to captions; any gap states itself
+ * plainly instead of dressing up as zero.
  */
 
 const heading = (
@@ -34,9 +34,8 @@ export async function SearchPerformancePanel({ project }: { project: PortalProje
   if (!isSearchConsoleConfigured() || !project.gscProperty) {
     return (
       <Note>
-        We&apos;re completing the connection to Google Search Console for your
-        site. Your clicks, impressions and average position will appear here
-        the moment they are real — this panel never shows placeholder numbers.
+        Connecting to Google Search Console — clicks, impressions and position
+        data plot here the moment they are real. No placeholder numbers, ever.
       </Note>
     );
   }
@@ -45,20 +44,17 @@ export async function SearchPerformancePanel({ project }: { project: PortalProje
   if (!data) {
     return (
       <Note>
-        Google&apos;s Search Console isn&apos;t reachable right now, so this
-        panel is waiting rather than showing a number that could be wrong.
-        Check back in a little while.
+        Google&apos;s Search Console isn&apos;t reachable right now — this
+        panel waits rather than plotting a number that could be wrong.
       </Note>
     );
   }
 
-  const previously = (value: string | undefined) =>
-    value === undefined ? null : `previous ${SEARCH_WINDOW_DAYS} days: ${value}`;
   const caption = (
     <p className="m-0 mt-5 text-[12.5px] leading-[1.6] text-neutral-700">
       Source: Google Search Console · {displayDate(data.period.from)} –{' '}
-      {displayDate(data.period.to)} (Google publishes its data a few days
-      behind) · last synced{' '}
+      {displayDate(data.period.to)} vs the {SEARCH_WINDOW_DAYS} days before ·
+      Google publishes a few days behind · synced{' '}
       {new Date(data.fetchedAt).toLocaleString('en-IN', {
         day: 'numeric',
         month: 'short',
@@ -74,15 +70,16 @@ export async function SearchPerformancePanel({ project }: { project: PortalProje
       <section className="border-2 border-text p-7">
         {heading}
         <p className="m-0 max-w-[58ch] text-[15px] leading-[1.65] text-neutral-800">
-          Google recorded no search impressions for your site in this window.
-          For a newly connected property that is normal — data starts
-          gathering from the connection onwards, and the first numbers can
-          take a few weeks to show.
+          No search impressions recorded in this window — normal for a newly
+          connected property; the first series can take weeks to build.
         </p>
         {caption}
       </section>
     );
   }
+
+  const totals = data.totals;
+  const prev = data.previousTotals;
 
   return (
     <section aria-labelledby="search-performance" className="border-2 border-text p-7">
@@ -93,28 +90,60 @@ export async function SearchPerformancePanel({ project }: { project: PortalProje
         Search performance
       </h2>
 
-      <div className="mb-7 grid grid-cols-[repeat(auto-fit,minmax(min(100%,170px),1fr))] gap-x-6 gap-y-5">
+      {/* KPI row with movement vs the previous window */}
+      <div className="mb-7 grid grid-cols-[repeat(auto-fit,minmax(min(100%,160px),1fr))] gap-x-6 gap-y-5">
         <Stat
           label="Clicks"
-          value={data.totals.clicks.toLocaleString('en-IN')}
-          sub={previously(data.previousTotals?.clicks.toLocaleString('en-IN'))}
+          value={totals.clicks.toLocaleString('en-IN')}
+          sub={null}
+          beside={<Delta now={totals.clicks} prev={prev?.clicks ?? null} />}
         />
         <Stat
           label="Impressions"
-          value={data.totals.impressions.toLocaleString('en-IN')}
-          sub={previously(data.previousTotals?.impressions.toLocaleString('en-IN'))}
+          value={totals.impressions.toLocaleString('en-IN')}
+          sub={null}
+          beside={<Delta now={totals.impressions} prev={prev?.impressions ?? null} />}
         />
         <Stat
           label="Click rate"
-          value={pct(data.totals.ctr)}
-          sub={previously(data.previousTotals ? pct(data.previousTotals.ctr) : undefined)}
+          value={pct(totals.ctr)}
+          sub={prev ? `was ${pct(prev.ctr)}` : null}
         />
         <Stat
           label="Avg. position"
-          value={data.totals.position.toFixed(1)}
-          sub={previously(data.previousTotals?.position.toFixed(1))}
+          value={totals.position.toFixed(1)}
+          sub={null}
+          beside={
+            <Delta
+              now={Math.round(totals.position * 10)}
+              prev={prev ? Math.round(prev.position * 10) : null}
+              lowerBetter
+              format={(n) => (n / 10).toFixed(1)}
+            />
+          }
         />
       </div>
+
+      {/* Daily series — two single-axis charts, never one dual-axis */}
+      {data.daily.length > 1 ? (
+        <div className="mb-7 flex flex-wrap gap-x-10 gap-y-6">
+          <Columns
+            heading="Clicks / day"
+            headingValue={totals.clicks.toLocaleString('en-IN')}
+            ariaLabel={`Daily clicks, ${displayDate(data.period.from)} to ${displayDate(data.period.to)}`}
+            points={data.daily.map((d) => ({ label: displayDate(d.date), value: d.clicks }))}
+          />
+          <Columns
+            heading="Impressions / day"
+            headingValue={totals.impressions.toLocaleString('en-IN')}
+            ariaLabel={`Daily impressions, ${displayDate(data.period.from)} to ${displayDate(data.period.to)}`}
+            points={data.daily.map((d) => ({
+              label: displayDate(d.date),
+              value: d.impressions,
+            }))}
+          />
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-x-10 gap-y-6">
         <RowsTable
@@ -133,10 +162,10 @@ export async function SearchPerformancePanel({ project }: { project: PortalProje
         />
       </div>
 
-      <p className="m-0 mt-6 text-[12.5px] leading-[1.6] text-neutral-700">
+      <p className="m-0 mt-5 text-[12.5px] leading-[1.6] text-neutral-700">
         &ldquo;Avg. position&rdquo; is Google&apos;s average across every search
-        your site appeared in — it moves with which searches happen, not only
-        with your rankings.
+        you appeared in — it moves with which searches happen, not only with
+        rankings.
       </p>
       {caption}
     </section>

@@ -4,9 +4,10 @@ import { ArrowRight, Check } from 'lucide-react';
 import { latestPageSpeed, latestStanding } from '@/lib/seoRecords';
 import { fetchSearchPerformance, isSearchConsoleConfigured } from '@/lib/searchConsole';
 import type { PortalProject } from '@/lib/portalProjects';
+import { ScoreRow } from '@/components/ScoreRings';
 import { portalProject } from '../../actions';
 import { SearchPerformancePanel } from './SearchPerformancePanel';
-import { OffpagePanel, OnPagePanel, RankingPanel, TechnicalPanel } from './PillarPanels';
+import { OffpagePanel, OnPagePanel, RankingPanel, StandingBar, TechnicalPanel } from './PillarPanels';
 import { ActivityPanel, DeliverablesPanel, ReportsPanel } from './WorkPanels';
 import { displayDate, PsiRow } from './bits';
 
@@ -112,24 +113,27 @@ async function LockedPreview({ project }: { project: PortalProject }) {
         </h2>
         {standing ? (
           <>
-            <div className="mb-1 font-heading text-[clamp(34px,4vw,48px)] font-extrabold leading-none tracking-[-0.04em]">
-              {standing.keywordsTop100.toLocaleString('en-IN')}
+            <div className="mb-5 flex flex-wrap items-baseline gap-x-8 gap-y-3">
+              <div>
+                <span className="font-heading text-[clamp(34px,4vw,48px)] font-extrabold leading-none tracking-[-0.04em]">
+                  {standing.keywordsTop100.toLocaleString('en-IN')}
+                </span>{' '}
+                <span className="text-[14px] text-neutral-800">searches · top 100</span>
+              </div>
+              <div>
+                <span className="font-heading text-[clamp(34px,4vw,48px)] font-extrabold leading-none tracking-[-0.04em]">
+                  {standing.keywordsTop10.toLocaleString('en-IN')}
+                </span>{' '}
+                <span className="text-[14px] text-neutral-800">on page one</span>
+              </div>
+              <div>
+                <span className="font-heading text-[clamp(34px,4vw,48px)] font-extrabold leading-none tracking-[-0.04em]">
+                  {standing.keywordsTop3.toLocaleString('en-IN')}
+                </span>{' '}
+                <span className="text-[14px] text-neutral-800">in the top 3</span>
+              </div>
             </div>
-            <p className="m-0 max-w-[58ch] text-[15px] leading-[1.65] text-neutral-800">
-              {standing.keywordsTop100 === 1 ? 'search shows' : 'searches show'}{' '}
-              your website in Google&apos;s top 100 —{' '}
-              <span className="font-semibold">
-                {standing.keywordsTop10.toLocaleString('en-IN')}
-              </span>{' '}
-              of them on page one
-              {standing.keywordsTop3 > 0 ? (
-                <>
-                  , <span className="font-semibold">{standing.keywordsTop3.toLocaleString('en-IN')}</span>{' '}
-                  in the top three
-                </>
-              ) : null}
-              .
-            </p>
+            <StandingBar standing={standing} />
           </>
         ) : (
           <p className="m-0 max-w-[58ch] text-[15px] leading-[1.65] text-neutral-800">
@@ -138,11 +142,11 @@ async function LockedPreview({ project }: { project: PortalProject }) {
           </p>
         )}
         {search?.totals ? (
-          <p className="m-0 mt-3 text-[13.5px] leading-[1.6] text-neutral-700">
+          <p className="m-0 mt-4 text-[13.5px] leading-[1.6] text-neutral-700">
             Google Search Console: average position{' '}
-            <span className="font-semibold">{search.totals.position.toFixed(1)}</span> across{' '}
-            {search.totals.impressions.toLocaleString('en-IN')} appearances in
-            the last 28 days.
+            <span className="font-semibold text-text">{search.totals.position.toFixed(1)}</span>{' '}
+            across {search.totals.impressions.toLocaleString('en-IN')} appearances
+            in the last 28 days.
           </p>
         ) : null}
         {standing ? (
@@ -163,7 +167,24 @@ async function LockedPreview({ project }: { project: PortalProject }) {
         </h2>
         {psi ? (
           <>
-            <PsiRow scores={psi.scores} />
+            {psi.scores.performance !== null &&
+            psi.scores.accessibility !== null &&
+            psi.scores.bestPractices !== null &&
+            psi.scores.seo !== null ? (
+              <ScoreRow
+                scores={{
+                  performance: psi.scores.performance,
+                  accessibility: psi.scores.accessibility,
+                  bestPractices: psi.scores.bestPractices,
+                  seo: psi.scores.seo,
+                }}
+                size="clamp(72px, 10vw, 104px)"
+                labelSize="10.5px"
+                className="max-w-[560px]"
+              />
+            ) : (
+              <PsiRow scores={psi.scores} />
+            )}
             <p className="m-0 mt-4 text-[12.5px] leading-[1.6] text-neutral-700">
               Measured by Google PageSpeed Insights (pagespeed.web.dev) ·
               mobile · {displayDate(psi.fetchedAt)}. These scores reflect the
@@ -178,19 +199,25 @@ async function LockedPreview({ project }: { project: PortalProject }) {
         )}
       </section>
 
-      {/* The short read. */}
+      {/* The short read — four tiles, one line each. */}
       <section className="border-2 border-neutral-300 p-7">
-        <h2 className="m-0 mb-3 font-heading text-[clamp(20px,2.4vw,28px)] font-bold leading-[1.15] tracking-[-0.028em]">
+        <h2 className="m-0 mb-5 font-heading text-[clamp(20px,2.4vw,28px)] font-bold leading-[1.15] tracking-[-0.028em]">
           SEO has four parts. Your build already covers the foundation.
         </h2>
-        <ul className="m-0 grid list-none gap-3 p-0">
-          {pillarExplainers.map(([name, line]) => (
-            <li key={name} className="text-[14.5px] leading-[1.6] text-neutral-800">
-              <span className="font-semibold text-text">{name}:</span> {line}
-            </li>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-4">
+          {pillarExplainers.map(([name, line], index) => (
+            <div key={name} className="border-l-2 border-accent pl-4">
+              <div className="mb-1 flex items-baseline gap-2.5">
+                <span className="font-heading text-[15px] font-extrabold leading-none tracking-[-0.01em] text-accent-700">
+                  0{index + 1}
+                </span>
+                <span className="text-[14.5px] font-bold leading-none">{name}</span>
+              </div>
+              <p className="m-0 text-[13.5px] leading-[1.55] text-neutral-700">{line}</p>
+            </div>
           ))}
-        </ul>
-        <p className="m-0 mt-4 max-w-[62ch] text-[14.5px] leading-[1.65] text-neutral-800">
+        </div>
+        <p className="m-0 mt-5 max-w-[62ch] text-[14.5px] leading-[1.65] text-neutral-800">
           The foundation ships with every site we build. Climbing for the
           searches that bring you business — and staying there — is continuous
           work. That is what the subscription covers.

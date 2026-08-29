@@ -410,6 +410,20 @@ ticket-plus-first-message).
     freshness guards inside the runners (PSI >20h, ranks >6d,
     standing/backlinks >27d), so a failed day retries and cadences live in
     code, not in the crontab.
+  - **Charts, not paragraphs** (user's direction 2026-08-29):
+    `app/portal/[projectId]/seo/charts.tsx` — flat, token-coloured,
+    server-rendered marks; no chart library, no client JS (native `title`
+    tooltips). Load-bearing rules: **one axis per chart** — daily clicks and
+    impressions are two `Columns` charts, never a dual axis; stacked
+    severity/visibility bars use accent-700 / accent-500 + **neutral-500 as
+    deliberate de-emphasis grey** (checked with the dataviz validator; the
+    printed counts legend is the required relief for the light segments);
+    movement direction lives in the ▲▼ glyph and sr-only text, **never in
+    colour alone** — the palette has no green. PageSpeed scores render
+    through the existing `components/ScoreRings.tsx` `ScoreRow` — the
+    Lighthouse tones exist in the tokens precisely so those scores match
+    Google's own widget. Rank sparklines invert their axis (rank 1 at the
+    top) and plot "not in top 100" on the floor with a 100+ tooltip.
 - **Renewal reminders**: `/api/cron/reminders` (daily VPS crontab, guarded by
   `CRON_SECRET` — unset = route plays dead) sends 30/15/7/1-day and at-expiry
   emails for both windows. One send per band per window end-date

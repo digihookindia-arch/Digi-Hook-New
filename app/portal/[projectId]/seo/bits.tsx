@@ -14,19 +14,25 @@ export function Stat({
   label,
   value,
   sub,
+  beside,
 }: {
   label: string;
   value: string;
   /** The comparison line under the number; null hides it. */
   sub: string | null;
+  /** Rendered on the number's baseline — usually a movement Delta tag. */
+  beside?: React.ReactNode;
 }) {
   return (
     <div className="border-l-2 border-neutral-300 pl-4">
       <div className="mb-1 text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
         {label}
       </div>
-      <div className="font-heading text-[clamp(26px,3vw,36px)] font-extrabold leading-none tracking-[-0.03em]">
-        {value}
+      <div className="flex items-baseline gap-2.5">
+        <span className="font-heading text-[clamp(26px,3vw,36px)] font-extrabold leading-none tracking-[-0.03em]">
+          {value}
+        </span>
+        {beside ?? null}
       </div>
       {sub ? (
         <div className="mt-1.5 text-[12.5px] leading-none text-neutral-700">{sub}</div>

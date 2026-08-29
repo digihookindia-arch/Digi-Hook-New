@@ -28,6 +28,7 @@ import {
 import {
   cleanGscProperty,
   searchWindow,
+  shapeDailyPoints,
   shapeSearchRows,
 } from '@/lib/searchConsole';
 import { shapePsiScores } from '@/lib/pageSpeed';
@@ -353,6 +354,15 @@ check('Google omitting rows entirely is a real empty result, not a failure',
 check('rows of the wrong shape read as unavailable', shapeSearchRows({ rows: 'nope' }) === null);
 check('a non-object payload reads as unavailable', shapeSearchRows('<html>error</html>') === null);
 check('null reads as unavailable', shapeSearchRows(null) === null);
+
+const daily = shapeDailyPoints([
+  { key: '2026-08-03', clicks: 4, impressions: 90, ctr: 0, position: 0 },
+  { key: '2026-08-01', clicks: 2, impressions: 40, ctr: 0, position: 0 },
+  { key: 'not-a-date', clicks: 9, impressions: 9, ctr: 0, position: 0 },
+]);
+check('daily points sort chronologically for the chart',
+  daily.length === 2 && daily[0]?.date === '2026-08-01' && daily[1]?.clicks === 4);
+check('non-date keys are dropped, not plotted', !daily.some((d) => d.date === 'not-a-date'));
 
 console.log('\n— every check reports under exactly one client-facing pillar —');
 

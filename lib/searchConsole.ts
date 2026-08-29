@@ -115,18 +115,11 @@ export function shapeSearchRows(payload: unknown): SearchRow[] | null {
 
 export type SearchTotals = Omit<SearchRow, 'key'>;
 
-export type SearchPerformance = {
+export type SearchPerformance = SearchWindowData & {
   /** The current window; the previous window is the same length before it. */
   period: { from: string; to: string };
   /** When this data was pulled from Google — the "last sync" line. */
   fetchedAt: string;
-  /** Null when the window genuinely recorded nothing (a site with no impressions). */
-  totals: SearchTotals | null;
-  previousTotals: SearchTotals | null;
-  topQueries: SearchRow[];
-  topPages: SearchRow[];
-  /** Distinct pages that appeared in results this window (counted up to 1000). */
-  pagesInSearch: number;
 };
 
 /* ── service-account token ─────────────────────────────────────────────── */
@@ -251,12 +244,24 @@ async function queryRows(
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
+export type DailyPoint = { date: string; clicks: number; impressions: number };
+
+/** Date-dimension rows → chronological daily points for the trend charts. */
+export function shapeDailyPoints(rows: SearchRow[]): DailyPoint[] {
+  return rows
+    .filter((row) => /^\d{4}-\d{2}-\d{2}$/.test(row.key))
+    .map((row) => ({ date: row.key, clicks: row.clicks, impressions: row.impressions }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export type SearchWindowData = {
   totals: SearchTotals | null;
   previousTotals: SearchTotals | null;
   topQueries: SearchRow[];
   topPages: SearchRow[];
   pagesInSearch: number;
+  /** One point per day of the window, oldest first — feeds the columns charts. */
+  daily: DailyPoint[];
 };
 
 /**
@@ -269,7 +274,7 @@ async function fetchWindowData(
   property: string,
   window: { from: string; to: string; prevFrom: string; prevTo: string }
 ): Promise<SearchWindowData | null> {
-  const [totals, previous, queries, pages] = await Promise.all([
+  const [totals, previous, queries, pages, byDate] = await Promise.all([
     queryRows(token, property, { startDate: window.from, endDate: window.to }),
     queryRows(token, property, { startDate: window.prevFrom, endDate: window.prevTo }),
     queryRows(token, property, {
@@ -284,15 +289,30 @@ async function fetchWindowData(
       dimensions: ['page'],
       rowLimit: 1000,
     }),
+    queryRows(token, property, {
+      startDate: window.from,
+      endDate: window.to,
+      dimensions: ['date'],
+      rowLimit: 40,
+    }),
   ]);
 
-  if (totals === null || previous === null || queries === null || pages === null) return null;
+  if (
+    totals === null ||
+    previous === null ||
+    queries === null ||
+    pages === null ||
+    byDate === null
+  ) {
+    return null;
+  }
   return {
     totals: totals[0] ?? null,
     previousTotals: previous[0] ?? null,
     topQueries: queries,
     topPages: pages.slice(0, 10),
     pagesInSearch: pages.length,
+    daily: shapeDailyPoints(byDate),
   };
 }
 

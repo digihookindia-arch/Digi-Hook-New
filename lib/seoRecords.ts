@@ -675,6 +675,8 @@ export type KeywordRank = {
   /** The check nearest ~30 days back, per lib/seoWork.movementBaseline. */
   baseline: RankCheck | null;
   trackedSince: string | null;
+  /** Recent checks oldest-first — the sparkline's series. */
+  history: RankCheck[];
 };
 
 type RankRow = {
@@ -703,6 +705,7 @@ export async function latestRanks(projectId: string): Promise<KeywordRank[]> {
       latest: checks[0] ?? null,
       baseline: base ? (checks.find((c) => c.checkedOn === base.checkedOn) ?? null) : null,
       trackedSince: checks.length > 0 ? checks[checks.length - 1]!.checkedOn : null,
+      history: [...checks].reverse(),
     };
   });
 }

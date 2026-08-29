@@ -1,7 +1,12 @@
 import { isRankDataConfigured } from '@/lib/dataForSeo';
 import { fetchSearchPerformance, isSearchConsoleConfigured } from '@/lib/searchConsole';
-import { latestAudit } from '@/lib/seoAudits';
-import { pillarCounts, pillarSummaryLine, type PillarCounts } from '@/lib/seoAudit';
+import { listAudits } from '@/lib/seoAudits';
+import {
+  pillarCounts,
+  pillarSummaryLine,
+  type IssueSeverity,
+  type PillarCounts,
+} from '@/lib/seoAudit';
 import {
   latestPageSpeed,
   latestRanks,
@@ -10,13 +15,15 @@ import {
   type StandingSnapshot,
 } from '@/lib/seoRecords';
 import type { PortalProject } from '@/lib/portalProjects';
+import { ScoreRow } from '@/components/ScoreRings';
 import { displayDate, pathOf, PsiRow, Stat } from './bits';
+import { Columns, Delta, RankSpark, SEVERITY_CHART, StackedBar, SeverityColumns } from './charts';
 
 /**
- * The workspace's four pillars — Google ranking, technical, on-page,
- * off-page — each summarised for the client: statuses, counts and real
- * numbers with their sources, never itemised issue lists (those live in
- * the studio dashboard; the work log is the client-facing evidence).
+ * The four pillars, chart-first: a keyword table with sparklines and
+ * movement glyphs, the Lighthouse rings, severity bars, issue-count trend
+ * columns and off-page KPIs. Clients read marks and counts, not
+ * paragraphs — and never itemised issue lists (those are dashboard-only).
  * Every gap states itself plainly instead of dressing up as zero.
  */
 
@@ -34,29 +41,68 @@ function kicker(id: string, text: string) {
 const noteClass = 'm-0 max-w-[58ch] text-[15px] leading-[1.65] text-neutral-800';
 const captionClass = 'm-0 mt-5 text-[12.5px] leading-[1.6] text-neutral-700';
 
-/** "Your site appears in Google's top 100 for N searches…" — shared line. */
-export function standingLine(standing: StandingSnapshot): string {
-  return `Your site appears in Google's top 100 for ${standing.keywordsTop100.toLocaleString('en-IN')} ${
-    standing.keywordsTop100 === 1 ? 'search' : 'searches'
-  } — ${standing.keywordsTop10.toLocaleString('en-IN')} of them on page one.`;
+const severitySegments = (counts: Record<IssueSeverity, number>) => [
+  { label: SEVERITY_CHART.error.label, value: counts.error, chip: SEVERITY_CHART.error.chip },
+  {
+    label: SEVERITY_CHART.warning.label,
+    value: counts.warning,
+    chip: SEVERITY_CHART.warning.chip,
+  },
+  {
+    label: SEVERITY_CHART.notice.label,
+    value: counts.notice,
+    chip: SEVERITY_CHART.notice.chip,
+  },
+];
+
+/** Severity counts as a bar, or the all-clear line when there is nothing to plot. */
+function SeverityRead({
+  counts,
+  ariaLabel,
+}: {
+  counts: Record<IssueSeverity, number>;
+  ariaLabel: string;
+}) {
+  if (counts.error + counts.warning + counts.notice === 0) {
+    return (
+      <p className="m-0 text-[14.5px] font-semibold leading-[1.5]">
+        All clear — nothing needs fixing.
+      </p>
+    );
+  }
+  return (
+    <div>
+      <StackedBar segments={severitySegments(counts)} ariaLabel={ariaLabel} />
+      <p className="m-0 mt-2 text-[13px] leading-[1.55] text-neutral-700">
+        {pillarSummaryLine(counts)}
+      </p>
+    </div>
+  );
 }
 
-/** How one keyword moved against its ~30-day baseline, in plain words. */
-function movementLabel(
-  latest: number | null,
-  baseline: { position: number | null } | null
-): string {
-  if (!baseline) return '—';
-  if (latest !== null && baseline.position !== null) {
-    const diff = baseline.position - latest;
-    if (diff > 0) return `up ${diff}`;
-    if (diff < 0) return `down ${-diff}`;
-    return 'steady';
-  }
-  if (latest !== null && baseline.position === null) return 'into the top 100';
-  if (latest === null && baseline.position !== null) return 'out of the top 100';
-  return 'steady';
+/** The domain's visibility split — page one in accent, the long tail in grey. */
+function StandingBar({ standing }: { standing: StandingSnapshot }) {
+  return (
+    <StackedBar
+      ariaLabel={`Search visibility: ${standing.keywordsTop3} searches in the top 3, ${standing.keywordsTop10 - standing.keywordsTop3} more on page one, ${Math.max(0, standing.keywordsTop100 - standing.keywordsTop10)} further back in the top 100`}
+      segments={[
+        { label: 'Top 3', value: standing.keywordsTop3, chip: 'bg-accent-700' },
+        {
+          label: 'Rest of page one',
+          value: Math.max(0, standing.keywordsTop10 - standing.keywordsTop3),
+          chip: 'bg-accent-500',
+        },
+        {
+          label: 'Positions 11–100',
+          value: Math.max(0, standing.keywordsTop100 - standing.keywordsTop10),
+          chip: 'bg-neutral-500',
+        },
+      ]}
+    />
+  );
 }
+
+export { StandingBar };
 
 export async function RankingPanel({ project }: { project: PortalProject }) {
   const [ranks, standing, search] = await Promise.all([
@@ -78,19 +124,17 @@ export async function RankingPanel({ project }: { project: PortalProject }) {
 
       {!isRankDataConfigured() ? (
         <p className={noteClass}>
-          We&apos;re connecting live rank tracking for your keywords. Positions
-          appear here the moment real checks run — this panel never shows
-          placeholder numbers.
+          Connecting live rank tracking — positions plot here the moment real
+          checks run. No placeholder numbers, ever.
         </p>
       ) : ranks.length === 0 ? (
         <p className={noteClass}>
-          We&apos;re finalising your target keyword list. Once it is agreed,
-          every keyword&apos;s position — and how it moves — is tracked here
-          weekly.
+          Target keyword list in progress — once agreed, every keyword&apos;s
+          position and its movement is tracked here weekly.
         </p>
       ) : checked.length === 0 ? (
         <p className={noteClass}>
-          Your keyword list is set — the first rank check runs this week.
+          Keyword list set — the first rank check runs this week.
         </p>
       ) : (
         <table className="w-full border-collapse text-[13.5px] leading-[1.5]">
@@ -98,23 +142,36 @@ export async function RankingPanel({ project }: { project: PortalProject }) {
             <tr className="border-b-2 border-text text-left">
               <th className="py-2 pr-3 font-semibold">Keyword</th>
               <th className="py-2 pr-3 text-right font-semibold">Today</th>
-              <th className="py-2 pr-3 text-right font-semibold">~30 days ago</th>
+              <th className="py-2 pr-3 text-right font-semibold">~30d ago</th>
               <th className="py-2 pr-3 text-right font-semibold">Change</th>
+              <th className="py-2 pr-3 text-right font-semibold">Trend</th>
               <th className="py-2 text-right font-semibold">Page</th>
             </tr>
           </thead>
           <tbody>
             {ranks.map((rank) => (
-              <tr key={rank.keyword.id} className="border-b border-neutral-300 align-top">
+              <tr key={rank.keyword.id} className="border-b border-neutral-300 align-middle">
                 <td className="py-2 pr-3">{rank.keyword.keyword}</td>
                 <td className="py-2 pr-3 text-right tabular-nums font-semibold">
                   {rank.latest ? (rank.latest.position ?? '100+') : '—'}
                 </td>
-                <td className="py-2 pr-3 text-right tabular-nums">
+                <td className="py-2 pr-3 text-right tabular-nums text-neutral-700">
                   {rank.baseline ? (rank.baseline.position ?? '100+') : '—'}
                 </td>
                 <td className="py-2 pr-3 text-right">
-                  {rank.latest ? movementLabel(rank.latest.position, rank.baseline) : '—'}
+                  <Delta
+                    now={rank.latest?.position ?? (rank.latest ? 101 : null)}
+                    prev={rank.baseline ? (rank.baseline.position ?? 101) : null}
+                    lowerBetter
+                  />
+                </td>
+                <td className="py-2 pr-3 text-right">
+                  <RankSpark
+                    points={rank.history.map((check) => ({
+                      label: displayDate(check.checkedOn),
+                      position: check.position,
+                    }))}
+                  />
                 </td>
                 <td
                   className="max-w-0 truncate py-2 text-right text-neutral-700"
@@ -128,44 +185,48 @@ export async function RankingPanel({ project }: { project: PortalProject }) {
         </table>
       )}
 
-      {checked.length > 0 && checked.some((rank) => !rank.baseline) ? (
-        <p className="m-0 mt-3 text-[13px] leading-[1.6] text-neutral-700">
-          &ldquo;—&rdquo; in the comparison column means tracking is younger
-          than a month there — the movement figure starts once 30 days of
-          history exist.
-        </p>
+      {standing ? (
+        <div className="mt-6">
+          <div className="mb-2 text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+            Search visibility · {standing.keywordsTop100.toLocaleString('en-IN')} searches show
+            your site in the top 100
+          </div>
+          <StandingBar standing={standing} />
+        </div>
       ) : null}
 
-      {standing ? (
-        <p className="m-0 mt-5 text-[14px] leading-[1.6] text-neutral-800">
-          {standingLine(standing)}
-        </p>
-      ) : null}
       {search?.totals ? (
-        <p className="m-0 mt-2 text-[13px] leading-[1.6] text-neutral-700">
-          Google Search Console average position:{' '}
-          <span className="font-semibold">{search.totals.position.toFixed(1)}</span> — Google&apos;s
-          own average across every search you appeared in, a different measure
+        <p className="m-0 mt-4 text-[13px] leading-[1.6] text-neutral-700">
+          Search Console average position:{' '}
+          <span className="font-semibold text-text">{search.totals.position.toFixed(1)}</span> —
+          Google&apos;s average across every appearance; a different measure
           from the fixed-location checks above.
         </p>
       ) : null}
 
       <p className={captionClass}>
         {checked.length > 0 && latestDate
-          ? `Checked ${displayDate(latestDate)} · location: ${project.rankLocation || 'India'} · mobile · source: live Google results via DataForSEO.`
-          : 'Source: live Google results via DataForSEO · checked weekly once tracking is live.'}
+          ? `Checked ${displayDate(latestDate)} · ${project.rankLocation || 'India'} · mobile · live Google results via DataForSEO · "—" = under 30 days of history.`
+          : 'Source: live Google results via DataForSEO · weekly once tracking is live.'}
       </p>
     </section>
   );
 }
 
 export async function TechnicalPanel({ project }: { project: PortalProject }) {
-  const [psi, audit] = await Promise.all([
+  const [psi, runs] = await Promise.all([
     latestPageSpeed(project.id),
-    latestAudit(project.id),
+    listAudits(project.id, 8),
   ]);
-  const counts: PillarCounts | null =
-    audit?.status === 'done' && audit.summary ? pillarCounts(audit.summary.issues) : null;
+  const done = runs.filter((run) => run.status === 'done' && run.summary).reverse();
+  const latest = done[done.length - 1] ?? null;
+  const counts: PillarCounts | null = latest ? pillarCounts(latest.summary!.issues) : null;
+  const fullScores =
+    psi &&
+    psi.scores.performance !== null &&
+    psi.scores.accessibility !== null &&
+    psi.scores.bestPractices !== null &&
+    psi.scores.seo !== null;
 
   return (
     <section aria-labelledby="seo-technical" className="border-2 border-text p-7">
@@ -173,10 +234,24 @@ export async function TechnicalPanel({ project }: { project: PortalProject }) {
 
       {psi ? (
         <>
-          <PsiRow scores={psi.scores} />
+          {fullScores ? (
+            <ScoreRow
+              scores={{
+                performance: psi.scores.performance!,
+                accessibility: psi.scores.accessibility!,
+                bestPractices: psi.scores.bestPractices!,
+                seo: psi.scores.seo!,
+              }}
+              size="clamp(64px, 9vw, 96px)"
+              labelSize="10.5px"
+              className="max-w-[520px]"
+            />
+          ) : (
+            <PsiRow scores={psi.scores} />
+          )}
           <p className="m-0 mt-3 text-[12.5px] leading-[1.6] text-neutral-700">
-            Scores by Google PageSpeed Insights (pagespeed.web.dev) · mobile ·
-            measured {displayDate(psi.fetchedAt)}.
+            Google PageSpeed Insights (pagespeed.web.dev) · mobile · measured{' '}
+            {displayDate(psi.fetchedAt)}.
           </p>
         </>
       ) : (
@@ -186,16 +261,43 @@ export async function TechnicalPanel({ project }: { project: PortalProject }) {
         </p>
       )}
 
-      <p className="m-0 mt-5 text-[14.5px] leading-[1.6] text-neutral-800">
-        <span className="font-semibold">Our weekly crawl:</span>{' '}
-        {counts
-          ? pillarSummaryLine(counts.technical)
-          : 'the first pass over your site runs within the week.'}
-      </p>
-      {audit?.status === 'done' ? (
+      <div className="mt-6">
+        <div className="mb-2 text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+          Weekly crawl · technical checks
+        </div>
+        {counts ? (
+          <SeverityRead
+            counts={counts.technical}
+            ariaLabel="Technical findings by severity"
+          />
+        ) : (
+          <p className={noteClass}>The first pass over your site runs within the week.</p>
+        )}
+      </div>
+
+      {done.length > 1 ? (
+        <div className="mt-6">
+          <div className="mb-2 text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+            Findings per pass · last {done.length} audits
+          </div>
+          <SeverityColumns
+            ariaLabel={`Issue counts across the last ${done.length} audit passes`}
+            points={done.map((run) => ({
+              label: displayDate(run.startedAt),
+              values: {
+                error: run.errors,
+                warning: run.warnings,
+                notice: run.notices,
+              },
+            }))}
+          />
+        </div>
+      ) : null}
+
+      {latest ? (
         <p className={captionClass}>
-          {audit.pages} pages checked {displayDate(audit.finishedAt ?? audit.startedAt)} ·
-          crawling, links, security and indexability · respects your robots.txt.
+          {latest.pages} pages checked {displayDate(latest.finishedAt ?? latest.startedAt)} ·
+          crawling, links, security, indexability · respects your robots.txt.
         </p>
       ) : null}
     </section>
@@ -203,48 +305,51 @@ export async function TechnicalPanel({ project }: { project: PortalProject }) {
 }
 
 export async function OnPagePanel({ project }: { project: PortalProject }) {
-  const [audit, search] = await Promise.all([
-    latestAudit(project.id),
+  const [runs, search] = await Promise.all([
+    listAudits(project.id, 1),
     isSearchConsoleConfigured() && project.gscProperty
       ? fetchSearchPerformance(project.gscProperty)
       : Promise.resolve(null),
   ]);
-  const counts: PillarCounts | null =
-    audit?.status === 'done' && audit.summary ? pillarCounts(audit.summary.issues) : null;
+  const latest = runs.find((run) => run.status === 'done' && run.summary) ?? null;
+  const counts: PillarCounts | null = latest ? pillarCounts(latest.summary!.issues) : null;
 
   return (
     <section aria-labelledby="seo-onpage" className="border-2 border-text p-7">
       {kicker('seo-onpage', 'On-page SEO')}
 
-      <p className="m-0 text-[14.5px] leading-[1.6] text-neutral-800">
-        <span className="font-semibold">Titles, descriptions, headings and content:</span>{' '}
-        {counts
-          ? pillarSummaryLine(counts.on_page)
-          : 'the first check over your pages runs within the week.'}
-      </p>
-
-      {search && search.pagesInSearch > 0 ? (
-        <p className="m-0 mt-4 text-[14px] leading-[1.6] text-neutral-800">
-          <span className="font-semibold">
-            {search.pagesInSearch.toLocaleString('en-IN')}
-          </span>{' '}
-          {search.pagesInSearch === 1 ? 'page' : 'pages'} of your site appeared
-          in Google results in the last 28 days
-          {search.pagesInSearch >= 1000 ? ' (counted up to 1,000)' : ''}.
-        </p>
-      ) : null}
+      <div className="flex flex-wrap items-start gap-x-10 gap-y-6">
+        <div className="min-w-0 flex-[2_1_280px]">
+          <div className="mb-2 text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+            Titles · descriptions · headings · content
+          </div>
+          {counts ? (
+            <SeverityRead counts={counts.on_page} ariaLabel="On-page findings by severity" />
+          ) : (
+            <p className={noteClass}>The first check over your pages runs within the week.</p>
+          )}
+        </div>
+        {search && search.pagesInSearch > 0 ? (
+          <Stat
+            label="Pages in Google results"
+            value={search.pagesInSearch.toLocaleString('en-IN')}
+            sub="last 28 days"
+          />
+        ) : null}
+      </div>
 
       <p className={captionClass}>
-        Optimisation work on specific pages is agreed under deliverables and
-        logged below, with its reasoning.
+        Page-level optimisation is agreed under deliverables and logged below
+        with its reasoning.
       </p>
     </section>
   );
 }
 
 export async function OffpagePanel({ project }: { project: PortalProject }) {
-  const snapshots = await listOffpage(project.id, 2);
+  const snapshots = await listOffpage(project.id, 12);
   const [latest, previous] = snapshots;
+  const series = [...snapshots].reverse();
 
   return (
     <section aria-labelledby="seo-offpage" className="border-2 border-text p-7">
@@ -252,36 +357,53 @@ export async function OffpagePanel({ project }: { project: PortalProject }) {
 
       {!isRankDataConfigured() ? (
         <p className={noteClass}>
-          We&apos;re connecting the link index for your site. Your backlink and
-          referring-domain counts appear here once the first real snapshot
-          lands.
+          Connecting the link index — backlink and referring-domain counts plot
+          here once the first real snapshot lands.
         </p>
       ) : !latest ? (
-        <p className={noteClass}>
-          The first off-page snapshot lands with the next monthly pass.
-        </p>
+        <p className={noteClass}>The first off-page snapshot lands with the next monthly pass.</p>
       ) : (
         <>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,170px),1fr))] gap-x-6 gap-y-5">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-x-6 gap-y-5">
             <Stat
               label="Backlinks"
               value={latest.backlinks.toLocaleString('en-IN')}
-              sub={previous ? `last snapshot: ${previous.backlinks.toLocaleString('en-IN')}` : null}
+              sub={previous ? `was ${previous.backlinks.toLocaleString('en-IN')}` : null}
+              beside={<Delta now={latest.backlinks} prev={previous?.backlinks ?? null} />}
             />
             <Stat
               label="Referring domains"
               value={latest.referringDomains.toLocaleString('en-IN')}
               sub={
-                previous
-                  ? `last snapshot: ${previous.referringDomains.toLocaleString('en-IN')}`
-                  : null
+                previous ? `was ${previous.referringDomains.toLocaleString('en-IN')}` : null
+              }
+              beside={
+                <Delta
+                  now={latest.referringDomains}
+                  prev={previous?.referringDomains ?? null}
+                />
               }
             />
           </div>
+
+          {series.length > 2 ? (
+            <div className="mt-6 flex flex-wrap gap-x-10 gap-y-6">
+              <Columns
+                heading="Referring domains / snapshot"
+                headingValue={latest.referringDomains.toLocaleString('en-IN')}
+                ariaLabel={`Referring domains across ${series.length} monthly snapshots`}
+                points={series.map((s) => ({
+                  label: displayDate(s.checkedOn),
+                  value: s.referringDomains,
+                }))}
+              />
+            </div>
+          ) : null}
+
           <p className={captionClass}>
             Source: DataForSEO link index · snapshot {displayDate(latest.checkedOn)} ·
-            refreshed monthly. Link building we do ourselves is logged in the
-            work record with its evidence.
+            monthly. Link building we do is logged in the work record with
+            evidence.
           </p>
         </>
       )}

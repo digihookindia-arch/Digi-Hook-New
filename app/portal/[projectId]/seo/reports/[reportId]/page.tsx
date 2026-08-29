@@ -9,6 +9,7 @@ import {
 } from '@/lib/seoWork';
 import { portalProject } from '../../../../actions';
 import { pathOf, pct, RowsTable, Stat } from '../../bits';
+import { Delta, SEVERITY_CHART, StackedBar } from '../../charts';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +105,12 @@ export default async function SeoReportPage({
                     ? `previous month: ${data.search.previousTotals.clicks.toLocaleString('en-IN')}`
                     : null
                 }
+                beside={
+                  <Delta
+                    now={data.search.totals.clicks}
+                    prev={data.search.previousTotals?.clicks ?? null}
+                  />
+                }
               />
               <Stat
                 label="Impressions"
@@ -112,6 +119,12 @@ export default async function SeoReportPage({
                   data.search.previousTotals
                     ? `previous month: ${data.search.previousTotals.impressions.toLocaleString('en-IN')}`
                     : null
+                }
+                beside={
+                  <Delta
+                    now={data.search.totals.impressions}
+                    prev={data.search.previousTotals?.impressions ?? null}
+                  />
                 }
               />
               <Stat
@@ -130,6 +143,18 @@ export default async function SeoReportPage({
                   data.search.previousTotals
                     ? `previous month: ${data.search.previousTotals.position.toFixed(1)}`
                     : null
+                }
+                beside={
+                  <Delta
+                    now={Math.round(data.search.totals.position * 10)}
+                    prev={
+                      data.search.previousTotals
+                        ? Math.round(data.search.previousTotals.position * 10)
+                        : null
+                    }
+                    lowerBetter
+                    format={(n) => (n / 10).toFixed(1)}
+                  />
                 }
               />
             </div>
@@ -175,32 +200,41 @@ export default async function SeoReportPage({
           </p>
         ) : (
           <>
-            <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
+            <div className="mb-5 flex flex-wrap items-baseline gap-x-8 gap-y-3">
               <div>
                 <span className="font-heading text-[clamp(24px,2.6vw,32px)] font-extrabold leading-none tracking-[-0.03em]">
                   {data.audit.pages}
                 </span>{' '}
                 <span className="text-[14px] text-neutral-800">pages checked</span>
               </div>
-              <div>
-                <span className="font-heading text-[clamp(24px,2.6vw,32px)] font-extrabold leading-none tracking-[-0.03em]">
-                  {data.audit.counts.error}
-                </span>{' '}
-                <span className="text-[14px] text-neutral-800">critical</span>
-              </div>
-              <div>
-                <span className="font-heading text-[clamp(24px,2.6vw,32px)] font-extrabold leading-none tracking-[-0.03em]">
-                  {data.audit.counts.warning}
-                </span>{' '}
-                <span className="text-[14px] text-neutral-800">warnings</span>
-              </div>
-              <div>
-                <span className="font-heading text-[clamp(24px,2.6vw,32px)] font-extrabold leading-none tracking-[-0.03em]">
-                  {data.audit.counts.notice}
-                </span>{' '}
-                <span className="text-[14px] text-neutral-800">notices</span>
-              </div>
             </div>
+            {data.audit.counts.error + data.audit.counts.warning + data.audit.counts.notice ===
+            0 ? (
+              <p className="m-0 text-[14.5px] font-semibold leading-[1.5]">
+                A clean pass — nothing flagged.
+              </p>
+            ) : (
+              <StackedBar
+                ariaLabel="Audit findings by severity"
+                segments={[
+                  {
+                    label: SEVERITY_CHART.error.label,
+                    value: data.audit.counts.error,
+                    chip: SEVERITY_CHART.error.chip,
+                  },
+                  {
+                    label: SEVERITY_CHART.warning.label,
+                    value: data.audit.counts.warning,
+                    chip: SEVERITY_CHART.warning.chip,
+                  },
+                  {
+                    label: SEVERITY_CHART.notice.label,
+                    value: data.audit.counts.notice,
+                    chip: SEVERITY_CHART.notice.chip,
+                  },
+                ]}
+              />
+            )}
             {data.audit.delta ? (
               <p className="m-0 mt-4 text-[14px] leading-[1.6] text-neutral-800">
                 Across the month:{' '}
@@ -230,7 +264,8 @@ export default async function SeoReportPage({
               <tr className="border-b-2 border-text text-left">
                 <th className="py-2 pr-3 font-semibold">Keyword</th>
                 <th className="py-2 pr-3 text-right font-semibold">Month end</th>
-                <th className="py-2 text-right font-semibold">Month start</th>
+                <th className="py-2 pr-3 text-right font-semibold">Month start</th>
+                <th className="py-2 text-right font-semibold">Change</th>
               </tr>
             </thead>
             <tbody>
@@ -240,10 +275,17 @@ export default async function SeoReportPage({
                   <td className="py-2 pr-3 text-right tabular-nums font-semibold">
                     {rank.position ?? '100+'}
                   </td>
-                  <td className="py-2 text-right tabular-nums">
+                  <td className="py-2 pr-3 text-right tabular-nums text-neutral-700">
                     {rank.prevPosition === null && rank.position !== null
                       ? '—'
                       : (rank.prevPosition ?? '100+')}
+                  </td>
+                  <td className="py-2 text-right">
+                    <Delta
+                      now={rank.position ?? 101}
+                      prev={rank.prevPosition}
+                      lowerBetter
+                    />
                   </td>
                 </tr>
               ))}
@@ -260,29 +302,32 @@ export default async function SeoReportPage({
       {data.offpage ? (
         <section className="border-2 border-text p-7">
           {sectionHeading('Off-page: your link profile')}
-          <div className="flex flex-wrap items-baseline gap-x-10 gap-y-3">
-            <div>
-              <span className="font-heading text-[clamp(24px,2.6vw,32px)] font-extrabold leading-none tracking-[-0.03em]">
-                {data.offpage.backlinks.toLocaleString('en-IN')}
-              </span>{' '}
-              <span className="text-[14px] text-neutral-800">
-                backlinks
-                {data.offpage.prevBacklinks !== null
-                  ? ` (was ${data.offpage.prevBacklinks.toLocaleString('en-IN')})`
-                  : ''}
-              </span>
-            </div>
-            <div>
-              <span className="font-heading text-[clamp(24px,2.6vw,32px)] font-extrabold leading-none tracking-[-0.03em]">
-                {data.offpage.referringDomains.toLocaleString('en-IN')}
-              </span>{' '}
-              <span className="text-[14px] text-neutral-800">
-                referring domains
-                {data.offpage.prevReferringDomains !== null
-                  ? ` (was ${data.offpage.prevReferringDomains.toLocaleString('en-IN')})`
-                  : ''}
-              </span>
-            </div>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-x-6 gap-y-5">
+            <Stat
+              label="Backlinks"
+              value={data.offpage.backlinks.toLocaleString('en-IN')}
+              sub={
+                data.offpage.prevBacklinks !== null
+                  ? `was ${data.offpage.prevBacklinks.toLocaleString('en-IN')}`
+                  : null
+              }
+              beside={<Delta now={data.offpage.backlinks} prev={data.offpage.prevBacklinks} />}
+            />
+            <Stat
+              label="Referring domains"
+              value={data.offpage.referringDomains.toLocaleString('en-IN')}
+              sub={
+                data.offpage.prevReferringDomains !== null
+                  ? `was ${data.offpage.prevReferringDomains.toLocaleString('en-IN')}`
+                  : null
+              }
+              beside={
+                <Delta
+                  now={data.offpage.referringDomains}
+                  prev={data.offpage.prevReferringDomains}
+                />
+              }
+            />
           </div>
           <p className="m-0 mt-4 text-[12.5px] leading-[1.6] text-neutral-700">
             Source: DataForSEO link index, monthly snapshot.
