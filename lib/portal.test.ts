@@ -32,7 +32,14 @@ import {
   TICKET_SUBJECT_MAX,
   TICKET_BODY_MAX,
 } from '@/lib/tickets';
-import { balanceInr, type PortalProject } from '@/lib/portalProjects';
+import {
+  balanceInr,
+  cleanSiteUrl,
+  cleanStatsCode,
+  type PortalProject,
+} from '@/lib/portalProjects';
+import { shapeStats } from '@/lib/stats';
+import { classifyHealth, sslDaysLeft } from '@/lib/siteHealth';
 
 let pass = 0;
 let fail = 0;
@@ -137,7 +144,8 @@ console.log('\n— the payment summary never shows a negative balance —');
 
 const project = (totalInr: number | null, paidInr: number): PortalProject => ({
   id: 'p', clientId: 'c', businessName: 'B', liveAt: null, supportDays: 180,
-  totalInr, paidInr, createdAt: '', updatedAt: '',
+  totalInr, paidInr, siteUrl: null, serverAt: null, serverDays: 365,
+  statsCode: null, statsToken: null, createdAt: '', updatedAt: '',
 });
 check('no total means no balance', balanceInr(project(null, 500)) === null);
 check('balance is total minus paid', balanceInr(project(100000, 20000)) === 80000);
@@ -175,6 +183,43 @@ check('a missing email is rejected',
   validateGoogleClaims({ ...goodClaims, email: undefined }, CID) === null);
 check('an empty configured client id rejects everything',
   validateGoogleClaims(goodClaims, '') === null);
+
+console.log('\n— overview inputs are validated, never trusted —');
+
+check('a bare domain becomes a normalised https URL',
+  cleanSiteUrl('client-site.in/') === 'https://client-site.in');
+check('an http URL passes through', cleanSiteUrl('http://old.example') === 'http://old.example');
+check('a javascript: URL is rejected', cleanSiteUrl('javascript:alert(1)') === null);
+check('an empty site URL is null', cleanSiteUrl('   ') === null);
+check('a stats code is lowercased', cleanStatsCode('  Sharma-Legal ') === 'sharma-legal');
+check('a stats code with a dot is rejected (it enters a Host header)',
+  cleanStatsCode('evil.example') === null);
+check('a stats code with a slash is rejected', cleanStatsCode('a/b') === null);
+
+console.log('\n— traffic numbers degrade to null, never to a broken chart —');
+
+const gcPayload = {
+  total: 12,
+  stats: [{ daily: 3 }, { daily: -1 }, { daily: 'x' }, { daily: 9 }],
+};
+const shaped = shapeStats(gcPayload, '2026-08-01', '2026-08-04');
+check('a GoatCounter payload shapes into the panel model', shaped?.pageviews === 12);
+check('negative and junk day counts read as 0',
+  JSON.stringify(shaped?.daily) === '[3,0,0,9]');
+check('a missing total falls back to the daily sum',
+  shapeStats({ stats: [{ daily: 2 }, { daily: 5 }] }, 'a', 'b')?.pageviews === 7);
+check('a malformed payload is null', shapeStats({ nope: true }, 'a', 'b') === null);
+check('a null payload is null', shapeStats(null, 'a', 'b') === null);
+
+console.log('\n— the status card never alarms without a signal —');
+
+check('a 200 is operational', classifyHealth(200) === 'operational');
+check('a 301 family is operational', classifyHealth(302) === 'operational');
+check('a 404 is a problem', classifyHealth(404) === 'problem');
+check('a 500 is a problem', classifyHealth(500) === 'problem');
+check('no status at all is unknown', classifyHealth(null) === 'unknown');
+check('ssl days floor at zero', sslDaysLeft(0, 86_400_000) === 0);
+check('a cert expiring tomorrow shows 1 day', sslDaysLeft(86_400_000, 0) === 1);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) process.exitCode = 1;

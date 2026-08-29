@@ -110,12 +110,19 @@ export async function updateProjectAction(
     return { error: 'Paid cannot be more than the project total.' };
   }
 
+  const serverAtRaw = String(formData.get('server_at') ?? '').trim();
+
   await updateProjectDetails(id, {
     businessName,
     liveAt: liveAtRaw || null,
     supportDays: Number(formData.get('support_days') ?? 180),
     totalInr,
     paidInr,
+    siteUrl: formData.get('site_url'),
+    serverAt: serverAtRaw || null,
+    serverDays: Number(formData.get('server_days') ?? 365),
+    statsCode: formData.get('stats_code'),
+    statsToken: formData.get('stats_token'),
   });
 
   revalidatePath(`/dashboard/portal/${id}`);

@@ -247,6 +247,58 @@ export async function setTicketStatus(id: string, status: TicketStatus): Promise
     .run(status, new Date().toISOString(), id);
 }
 
+export type ActivityItem = {
+  at: string;
+  ticketId: string;
+  subject: string;
+  kind: TicketKind;
+  /** raised = the ticket's opening message; replies keep their author. */
+  type: 'raised' | 'studio_reply' | 'client_reply';
+};
+
+/**
+ * The overview's recent-activity feed, distilled from the ticket threads.
+ * The opening message shares its timestamp with the ticket row (one
+ * transaction writes both), which is what separates "raised" from a reply.
+ */
+export async function recentActivityForProject(
+  projectId: string,
+  limit = 6
+): Promise<ActivityItem[]> {
+  const rows = getDb()
+    .prepare(
+      `SELECT m.created_at AS at, m.author AS author,
+              (m.created_at = t.created_at) AS opening,
+              t.id AS ticket_id, t.subject AS subject, t.kind AS kind
+         FROM ticket_messages m
+         JOIN tickets t ON t.id = m.ticket_id
+        WHERE t.project_id = ?
+        ORDER BY m.created_at DESC
+        LIMIT ?`
+    )
+    .all(projectId, limit) as {
+    at: string;
+    author: string;
+    opening: number;
+    ticket_id: string;
+    subject: string;
+    kind: string;
+  }[];
+
+  return rows.map((row) => ({
+    at: row.at,
+    ticketId: row.ticket_id,
+    subject: row.subject,
+    kind: parseKind(row.kind),
+    type:
+      row.opening === 1
+        ? 'raised'
+        : row.author === 'studio'
+          ? 'studio_reply'
+          : 'client_reply',
+  }));
+}
+
 /**
  * The dashboard badge: tickets where the client spoke last and the ticket is
  * not closed. Counting 'open' alone would go dark the moment a status changed

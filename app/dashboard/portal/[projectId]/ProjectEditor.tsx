@@ -80,11 +80,64 @@ export function ProjectEditor({ project }: { project: PortalProject }) {
             className={inputClass}
           />
         </label>
+        <label className="block">
+          <span className={labelClass}>Live site URL</span>
+          <input
+            name="site_url"
+            type="url"
+            placeholder="https://client-site.in"
+            defaultValue={project.siteUrl ?? ''}
+            className={inputClass}
+          />
+        </label>
+        <label className="block">
+          <span className={labelClass}>Server start date</span>
+          <input
+            name="server_at"
+            type="date"
+            defaultValue={project.serverAt ?? ''}
+            className={inputClass}
+          />
+        </label>
+        <label className="block">
+          <span className={labelClass}>Server days</span>
+          <input
+            name="server_days"
+            type="number"
+            min={0}
+            max={3650}
+            defaultValue={project.serverDays}
+            className={inputClass}
+          />
+        </label>
+        <label className="block">
+          <span className={labelClass}>Stats code</span>
+          <input
+            name="stats_code"
+            type="text"
+            placeholder="e.g. sharma-legal"
+            defaultValue={project.statsCode ?? ''}
+            className={inputClass}
+          />
+        </label>
+        <label className="block">
+          <span className={labelClass}>Stats API token</span>
+          <input
+            name="stats_token"
+            type="text"
+            placeholder="From the GoatCounter site"
+            defaultValue={project.statsToken ?? ''}
+            className={inputClass}
+          />
+        </label>
       </div>
 
       <p className="m-0 mt-3 text-[12.5px] leading-[1.55] text-neutral-700">
-        The support countdown starts on the live date. Leave the total empty
-        and the client sees no payments panel at all.
+        The support countdown starts on the live date; the server countdown on
+        the server start date. Leave the total empty and the client sees no
+        payments panel. Site URL turns on the website-status card; stats code
+        + token (lowercase letters, digits, hyphens — see the GoatCounter
+        runbook) turn on the traffic panel.
       </p>
 
       {state.error ? (

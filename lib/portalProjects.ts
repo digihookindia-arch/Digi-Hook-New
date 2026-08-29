@@ -19,6 +19,14 @@ export type PortalProject = {
   /** Whole rupees. Null hides the payments panel — payments not set up yet. */
   totalInr: number | null;
   paidInr: number;
+  /** The client's live website. Null hides the website-status card. */
+  siteUrl: string | null;
+  /** Complimentary server window: starts server_at, runs serverDays. */
+  serverAt: string | null;
+  serverDays: number;
+  /** GoatCounter site code + API token. Null code hides the traffic panel. */
+  statsCode: string | null;
+  statsToken: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -31,6 +39,11 @@ type Row = {
   support_days: number;
   total_inr: number | null;
   paid_inr: number;
+  site_url: string | null;
+  server_at: string | null;
+  server_days: number;
+  stats_code: string | null;
+  stats_token: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -44,9 +57,41 @@ function toProject(row: Row): PortalProject {
     supportDays: row.support_days ?? 180,
     totalInr: row.total_inr,
     paidInr: row.paid_inr ?? 0,
+    siteUrl: row.site_url ?? null,
+    serverAt: row.server_at ?? null,
+    serverDays: row.server_days ?? 365,
+    statsCode: row.stats_code ?? null,
+    statsToken: row.stats_token ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/**
+ * The client's site URL, or null for anything that is not a plain http(s)
+ * URL. Normalised without a trailing slash so health checks and display
+ * agree on one form.
+ */
+export function cleanSiteUrl(value: unknown): string | null {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  try {
+    const url = new URL(text.includes('://') ? text : `https://${text}`);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return url.href.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A GoatCounter site code. Strict on purpose — it is interpolated into a
+ * Host header by the stats proxy, so nothing but lowercase alnum/hyphen may
+ * pass.
+ */
+export function cleanStatsCode(value: unknown): string | null {
+  const text = String(value ?? '').trim().toLowerCase();
+  return /^[a-z0-9-]{1,63}$/.test(text) ? text : null;
 }
 
 export async function createProject(input: {
@@ -62,6 +107,11 @@ export async function createProject(input: {
     supportDays: 180,
     totalInr: null,
     paidInr: 0,
+    siteUrl: null,
+    serverAt: null,
+    serverDays: 365,
+    statsCode: null,
+    statsToken: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -126,6 +176,11 @@ export async function updateProjectDetails(
     supportDays: number;
     totalInr: number | null;
     paidInr: number;
+    siteUrl?: unknown;
+    serverAt?: string | null;
+    serverDays?: number;
+    statsCode?: unknown;
+    statsToken?: unknown;
   }
 ): Promise<void> {
   const supportDays = Number.isFinite(input.supportDays)
@@ -137,10 +192,19 @@ export async function updateProjectDetails(
   let paidInr = toAmount(input.paidInr, 0) ?? 0;
   if (totalInr !== null && paidInr > totalInr) paidInr = totalInr;
 
+  const serverDays = Number.isFinite(input.serverDays)
+    ? Math.min(3650, Math.max(0, Math.floor(input.serverDays as number)))
+    : 365;
+  const serverAt =
+    input.serverAt && /^\d{4}-\d{2}-\d{2}$/.test(input.serverAt) ? input.serverAt : null;
+  const statsToken = String(input.statsToken ?? '').trim() || null;
+
   getDb()
     .prepare(
       `UPDATE portal_projects
-          SET business_name = ?, live_at = ?, support_days = ?, total_inr = ?, paid_inr = ?, updated_at = ?
+          SET business_name = ?, live_at = ?, support_days = ?, total_inr = ?, paid_inr = ?,
+              site_url = ?, server_at = ?, server_days = ?, stats_code = ?, stats_token = ?,
+              updated_at = ?
         WHERE id = ?`
     )
     .run(
@@ -149,6 +213,11 @@ export async function updateProjectDetails(
       supportDays,
       totalInr,
       paidInr,
+      cleanSiteUrl(input.siteUrl),
+      serverAt,
+      serverDays,
+      cleanStatsCode(input.statsCode),
+      statsToken,
       new Date().toISOString(),
       id
     );

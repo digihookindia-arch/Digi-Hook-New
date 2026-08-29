@@ -127,6 +127,11 @@ const SCHEMA = `
     support_days  INTEGER NOT NULL DEFAULT 180,
     total_inr     INTEGER,
     paid_inr      INTEGER NOT NULL DEFAULT 0,
+    site_url      TEXT,
+    server_at     TEXT,
+    server_days   INTEGER NOT NULL DEFAULT 365,
+    stats_code    TEXT,
+    stats_token   TEXT,
     created_at    TEXT NOT NULL,
     updated_at    TEXT NOT NULL
   );
@@ -244,6 +249,17 @@ export function getDb(): DatabaseSync {
     // read back as '' and the dashboard asks for an address before sending.
     addColumnIfMissing(db, 'proposals', 'client_email', "TEXT NOT NULL DEFAULT ''");
     addColumnIfMissing(db, 'proposals', 'client_phone', "TEXT NOT NULL DEFAULT ''");
+    // Portal overview upgrade (Phase 1). The client's live site, so the portal
+    // can show an uptime/SSL card and link the traffic panel to something real.
+    addColumnIfMissing(db, 'portal_projects', 'site_url', 'TEXT');
+    // Complimentary server window, same shape as the support plan: starts on
+    // its own date (usually go-live) and runs server_days from there.
+    addColumnIfMissing(db, 'portal_projects', 'server_at', 'TEXT');
+    addColumnIfMissing(db, 'portal_projects', 'server_days', 'INTEGER NOT NULL DEFAULT 365');
+    // GoatCounter site code + per-site API token for the traffic panel.
+    // Null code hides the panel, the total_inr convention.
+    addColumnIfMissing(db, 'portal_projects', 'stats_code', 'TEXT');
+    addColumnIfMissing(db, 'portal_projects', 'stats_token', 'TEXT');
     global._dhSqlite = db;
   }
   return global._dhSqlite;
