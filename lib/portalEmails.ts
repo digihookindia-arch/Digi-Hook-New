@@ -1,5 +1,6 @@
 import { milestoneEmailHtml, shortReference } from './emailTemplate';
 import { site, SITE_URL } from './site';
+import { formatInr } from './delivery';
 import type { TicketKind } from './tickets';
 
 /**
@@ -170,6 +171,58 @@ export function ticketReceivedEmail(input: {
       detailRightLabel: 'Status',
       detailRightValue: input.outOfSupport && !isFeature ? 'Needs a quote' : 'Open',
       ctaText: isFeature ? 'View your request' : 'View your ticket',
+      ctaHref: input.portalUrl,
+      secondaryLine: contactLine(),
+      footerNote: PORTAL_FOOTER,
+    }),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Quote sent on a feature request                                     */
+/* ------------------------------------------------------------------ */
+
+export function quoteSentEmail(input: {
+  name: string;
+  /** Client-typed originally — escaped slots only. */
+  subject: string;
+  quoteInr: number;
+  /** Studio-authored scope note; escaped anyway. */
+  quoteNote: string;
+  ticketId: string;
+  portalUrl: string;
+}): PortalMail {
+  const reference = shortReference(input.ticketId);
+  const amount = formatInr(input.quoteInr);
+
+  return {
+    subject: `Your quote is ready (${reference}) — Digi Hook`,
+    body: [
+      `Hi ${firstName(input.name)},`,
+      '',
+      `We have quoted your request "${input.subject}":`,
+      '',
+      `  ${amount} plus applicable GST`,
+      ...(input.quoteNote ? ['', input.quoteNote] : []),
+      '',
+      'Nothing starts until you approve it — open your portal to approve, or reply there with questions.',
+      '',
+      `Approve or discuss here: ${input.portalUrl}`,
+      '',
+      `Your reference is ${reference}.`,
+      ...signOff(),
+    ].join('\n'),
+    html: milestoneEmailHtml({
+      preheader: 'Your quote is ready to review. Nothing starts until you approve it.',
+      kicker: 'Quote ready',
+      headline: 'Your quote<br>is ready to<br>review.',
+      leadHeading: 'We have scoped your request.',
+      leadBody: `"${excerpt(input.subject, 80)}" — ${amount} plus applicable GST.${input.quoteNote ? ` ${excerpt(input.quoteNote, 220)}` : ''} Nothing starts until you approve it on your portal, and questions are welcome first.`,
+      detailLeftLabel: 'Quoted amount',
+      detailLeftValue: `${amount} + GST`,
+      detailRightLabel: 'Reference',
+      detailRightValue: reference,
+      ctaText: 'Review and approve',
       ctaHref: input.portalUrl,
       secondaryLine: contactLine(),
       footerNote: PORTAL_FOOTER,

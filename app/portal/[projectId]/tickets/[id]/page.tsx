@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getTicket, listMessages, TICKET_KIND_LABELS } from '@/lib/tickets';
+import { getTicket, listAttachments, listMessages, TICKET_KIND_LABELS } from '@/lib/tickets';
 import { shortReference } from '@/lib/emailTemplate';
 import { portalProject } from '../../../actions';
 import { ReplyForm } from '../../ReplyForm';
 import {
   displayDateTime,
   OutOfSupportPill,
+  PriorityPill,
+  QuotePanel,
   ThreadView,
   TicketStatusPill,
 } from '../../TicketBits';
@@ -37,7 +39,10 @@ export default async function TicketThreadPage({
   if (!ticket || ticket.clientId !== client.id || ticket.projectId !== project.id) {
     notFound();
   }
-  const messages = await listMessages(ticket.id);
+  const [messages, attachments] = await Promise.all([
+    listMessages(ticket.id),
+    listAttachments(ticket.id),
+  ]);
   const backHref =
     ticket.kind === 'feature'
       ? `/portal/${project.id}/features`
@@ -57,15 +62,33 @@ export default async function TicketThreadPage({
           <h2 className="m-0 font-heading text-[clamp(20px,2.4vw,28px)] font-bold leading-[1.15] tracking-[-0.028em]">
             {ticket.subject}
           </h2>
-          <p className="m-0 mt-2 text-[13px] leading-none text-neutral-700">
+          <p className="m-0 mt-2 text-[13px] leading-[1.5] text-neutral-700">
             {TICKET_KIND_LABELS[ticket.kind]} · {shortReference(ticket.id)} · raised{' '}
             {displayDateTime(ticket.createdAt)}
+            {ticket.pageUrl ? (
+              <>
+                {' · '}
+                <a
+                  href={ticket.pageUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-accent-700"
+                >
+                  affected page
+                </a>
+              </>
+            ) : null}
           </p>
         </div>
         <div className="flex items-center gap-2.5">
+          <PriorityPill priority={ticket.priority} />
           {ticket.outOfSupport ? <OutOfSupportPill /> : null}
           <TicketStatusPill status={ticket.status} />
         </div>
+      </div>
+
+      <div className="mb-6 empty:hidden">
+        <QuotePanel ticket={ticket} />
       </div>
 
       {ticket.outOfSupport ? (
@@ -77,7 +100,11 @@ export default async function TicketThreadPage({
         </div>
       ) : null}
 
-      <ThreadView messages={messages} />
+      <ThreadView
+        messages={messages}
+        attachments={attachments}
+        hrefFor={(a) => `/portal/${project.id}/tickets/${ticket.id}/file/${a.id}`}
+      />
 
       {ticket.status === 'closed' ? (
         <p className="m-0 mt-6 text-[14px] leading-[1.6] text-neutral-700">

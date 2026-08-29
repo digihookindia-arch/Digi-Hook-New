@@ -29,6 +29,10 @@ import {
   isTicketStatus,
   cleanSubject,
   cleanBody,
+  parsePriority,
+  cleanQuoteInr,
+  attachmentProblem,
+  ATTACHMENT_MAX_BYTES,
   TICKET_SUBJECT_MAX,
   TICKET_BODY_MAX,
 } from '@/lib/tickets';
@@ -139,6 +143,16 @@ check('an overlong subject is capped',
   cleanSubject('s'.repeat(9999))?.length === TICKET_SUBJECT_MAX);
 check('an overlong body is capped', cleanBody('b'.repeat(99999))?.length === TICKET_BODY_MAX);
 check('a null body is null, not the string "null"', cleanBody(null) === null);
+check('an unknown priority falls back to normal', parsePriority('critical') === 'normal');
+check('a known priority passes through', parsePriority('urgent') === 'urgent');
+check('a quote parses to whole rupees', cleanQuoteInr('45000.9') === 45000);
+check('a zero quote is rejected', cleanQuoteInr(0) === null);
+check('an absurd quote is rejected', cleanQuoteInr(9e9) === null);
+check('a prose quote is rejected', cleanQuoteInr('call us') === null);
+check('an allowed image within size passes', attachmentProblem('image/png', 1024) === null);
+check('a disallowed mime is refused', attachmentProblem('application/zip', 1024) !== null);
+check('an oversize file is refused', attachmentProblem('image/png', ATTACHMENT_MAX_BYTES + 1) !== null);
+check('an empty file is refused', attachmentProblem('image/png', 0) !== null);
 
 console.log('\n— the payment summary never shows a negative balance —');
 

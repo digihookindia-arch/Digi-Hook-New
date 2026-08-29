@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getDb } from './db';
+import { cleanHttpUrl } from './ticketRules';
 
 /**
  * Portal engagements — the page a client sees after logging in. One row per
@@ -68,21 +69,10 @@ function toProject(row: Row): PortalProject {
 }
 
 /**
- * The client's site URL, or null for anything that is not a plain http(s)
- * URL. Normalised without a trailing slash so health checks and display
- * agree on one form.
+ * The client's site URL — the shared http(s) cleaner from the pure rules
+ * module, re-exported under the name this module's callers already use.
  */
-export function cleanSiteUrl(value: unknown): string | null {
-  const text = String(value ?? '').trim();
-  if (!text) return null;
-  try {
-    const url = new URL(text.includes('://') ? text : `https://${text}`);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
-    return url.href.replace(/\/$/, '');
-  } catch {
-    return null;
-  }
-}
+export { cleanHttpUrl as cleanSiteUrl } from './ticketRules';
 
 /**
  * A GoatCounter site code. Strict on purpose — it is interpolated into a
@@ -213,7 +203,7 @@ export async function updateProjectDetails(
       supportDays,
       totalInr,
       paidInr,
-      cleanSiteUrl(input.siteUrl),
+      cleanHttpUrl(input.siteUrl),
       serverAt,
       serverDays,
       cleanStatsCode(input.statsCode),

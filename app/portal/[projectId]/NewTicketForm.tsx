@@ -3,7 +3,10 @@
 import { useActionState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import {
+  ATTACHMENTS_PER_MESSAGE,
+  PRIORITY_LABELS,
   TICKET_BODY_MAX,
+  TICKET_PRIORITIES,
   TICKET_SUBJECT_MAX,
   type TicketKind,
 } from '@/lib/ticketRules';
@@ -86,6 +89,51 @@ export function NewTicketForm({
         }`}
       />
       <p className="m-0 mt-2 text-[12.5px] leading-[1.5] text-neutral-700">{copy.bodyHint}</p>
+
+      <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-4">
+        {kind === 'support' ? (
+          <label className="block">
+            <span className="mb-2 block text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+              How urgent is it?
+            </span>
+            <select
+              name="priority"
+              defaultValue="normal"
+              className="w-full border-2 border-neutral-400 bg-bg p-3 text-[14px] leading-none text-text"
+            >
+              {TICKET_PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {PRIORITY_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <label className="block">
+          <span className="mb-2 block text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+            Page it affects (optional)
+          </span>
+          <input
+            name="page_url"
+            type="text"
+            placeholder="https://…"
+            className="w-full border-2 border-neutral-400 bg-bg p-3 text-[14px] leading-none text-text placeholder:text-neutral-500"
+          />
+        </label>
+      </div>
+
+      <label className="mt-5 block">
+        <span className="mb-2 block text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+          Screenshots or files (optional, up to {ATTACHMENTS_PER_MESSAGE})
+        </span>
+        <input
+          name="files"
+          type="file"
+          multiple
+          accept="image/png,image/jpeg,image/webp,application/pdf"
+          className="w-full border-2 border-neutral-400 bg-bg p-3 text-[13.5px] leading-none text-neutral-800 file:mr-3 file:border-0 file:bg-text file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:uppercase file:text-bg"
+        />
+      </label>
       {state.error ? (
         <p
           id={`${kind}-error`}

@@ -156,7 +156,14 @@ const SCHEMA = `
     out_of_support INTEGER NOT NULL DEFAULT 0,
     created_at     TEXT NOT NULL,
     updated_at     TEXT NOT NULL,
-    last_sender    TEXT NOT NULL DEFAULT 'client'
+    last_sender    TEXT NOT NULL DEFAULT 'client',
+    priority       TEXT NOT NULL DEFAULT 'normal',
+    page_url       TEXT,
+    quote_inr      INTEGER,
+    quote_note     TEXT NOT NULL DEFAULT '',
+    quoted_at      TEXT,
+    approved_at    TEXT,
+    quote_paid_at  TEXT
   );
   CREATE INDEX IF NOT EXISTS tickets_created_at ON tickets (created_at DESC);
   CREATE INDEX IF NOT EXISTS tickets_status ON tickets (status);
@@ -170,6 +177,24 @@ const SCHEMA = `
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS ticket_messages_ticket ON ticket_messages (ticket_id, created_at);
+
+  /*
+   * Screenshots and documents attached to ticket messages. The database
+   * stores metadata only; the file itself lives on disk under data/uploads
+   * (gitignored, same survival story as the SQLite file). No FK on purpose,
+   * matching the rest of the ticket model.
+   */
+  CREATE TABLE IF NOT EXISTS ticket_attachments (
+    id         TEXT PRIMARY KEY,
+    ticket_id  TEXT NOT NULL,
+    message_id TEXT NOT NULL,
+    filename   TEXT NOT NULL,
+    mime       TEXT NOT NULL,
+    size       INTEGER NOT NULL,
+    path       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS ticket_attachments_ticket ON ticket_attachments (ticket_id);
 
   /*
    * Every client-facing milestone email we have tried to send. One row per
@@ -260,6 +285,17 @@ export function getDb(): DatabaseSync {
     // Null code hides the panel, the total_inr convention.
     addColumnIfMissing(db, 'portal_projects', 'stats_code', 'TEXT');
     addColumnIfMissing(db, 'portal_projects', 'stats_token', 'TEXT');
+    // Ticket workflow upgrade (Phase 2): client-set priority and affected
+    // page, and the quote-and-approve loop on feature requests. quoted_at /
+    // approved_at / quote_paid_at are one-way timestamps, the accepted_at
+    // pattern - history, not state to toggle.
+    addColumnIfMissing(db, 'tickets', 'priority', "TEXT NOT NULL DEFAULT 'normal'");
+    addColumnIfMissing(db, 'tickets', 'page_url', 'TEXT');
+    addColumnIfMissing(db, 'tickets', 'quote_inr', 'INTEGER');
+    addColumnIfMissing(db, 'tickets', 'quote_note', "TEXT NOT NULL DEFAULT ''");
+    addColumnIfMissing(db, 'tickets', 'quoted_at', 'TEXT');
+    addColumnIfMissing(db, 'tickets', 'approved_at', 'TEXT');
+    addColumnIfMissing(db, 'tickets', 'quote_paid_at', 'TEXT');
     global._dhSqlite = db;
   }
   return global._dhSqlite;

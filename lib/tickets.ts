@@ -5,8 +5,10 @@ import {
   cleanSubject,
   isTicketStatus,
   parseKind,
+  parsePriority,
   type TicketAuthor,
   type TicketKind,
+  type TicketPriority,
   type TicketStatus,
 } from './ticketRules';
 
@@ -35,6 +37,14 @@ export type Ticket = {
   createdAt: string;
   updatedAt: string;
   lastSender: TicketAuthor;
+  priority: TicketPriority;
+  pageUrl: string | null;
+  /** The quote-and-approve loop on feature requests. All one-way stamps. */
+  quoteInr: number | null;
+  quoteNote: string;
+  quotedAt: string | null;
+  approvedAt: string | null;
+  quotePaidAt: string | null;
 };
 
 export type TicketMessage = {
@@ -58,6 +68,13 @@ type TicketRow = {
   created_at: string;
   updated_at: string;
   last_sender: string;
+  priority: string;
+  page_url: string | null;
+  quote_inr: number | null;
+  quote_note: string;
+  quoted_at: string | null;
+  approved_at: string | null;
+  quote_paid_at: string | null;
 };
 
 type MessageRow = {
@@ -80,6 +97,13 @@ function toTicket(row: TicketRow): Ticket {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastSender: row.last_sender === 'studio' ? 'studio' : 'client',
+    priority: parsePriority(row.priority),
+    pageUrl: row.page_url ?? null,
+    quoteInr: row.quote_inr ?? null,
+    quoteNote: row.quote_note ?? '',
+    quotedAt: row.quoted_at ?? null,
+    approvedAt: row.approved_at ?? null,
+    quotePaidAt: row.quote_paid_at ?? null,
   };
 }
 
@@ -104,7 +128,9 @@ export async function createTicket(input: {
   subject: string;
   body: string;
   outOfSupport: boolean;
-}): Promise<Ticket> {
+  priority?: TicketPriority;
+  pageUrl?: string | null;
+}): Promise<Ticket & { openingMessageId: string }> {
   const subject = cleanSubject(input.subject);
   const body = cleanBody(input.body);
   if (!subject || !body) throw new Error('A ticket needs a subject and a message.');
@@ -121,15 +147,24 @@ export async function createTicket(input: {
     createdAt: now,
     updatedAt: now,
     lastSender: 'client',
+    priority: parsePriority(input.priority),
+    pageUrl: input.pageUrl ?? null,
+    quoteInr: null,
+    quoteNote: '',
+    quotedAt: null,
+    approvedAt: null,
+    quotePaidAt: null,
   };
+  const openingMessageId = randomUUID();
 
   const db = getDb();
   db.exec('BEGIN');
   try {
     db.prepare(
       `INSERT INTO tickets
-         (id, project_id, client_id, kind, subject, status, out_of_support, created_at, updated_at, last_sender)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (id, project_id, client_id, kind, subject, status, out_of_support,
+          created_at, updated_at, last_sender, priority, page_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       ticket.id,
       ticket.projectId,
@@ -140,18 +175,20 @@ export async function createTicket(input: {
       ticket.outOfSupport ? 1 : 0,
       ticket.createdAt,
       ticket.updatedAt,
-      ticket.lastSender
+      ticket.lastSender,
+      ticket.priority,
+      ticket.pageUrl
     );
     db.prepare(
       `INSERT INTO ticket_messages (id, ticket_id, author, body, created_at)
        VALUES (?, ?, ?, ?, ?)`
-    ).run(randomUUID(), ticket.id, 'client', body, now);
+    ).run(openingMessageId, ticket.id, 'client', body, now);
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
   }
-  return ticket;
+  return { ...ticket, openingMessageId };
 }
 
 export async function getTicket(id: string): Promise<Ticket | null> {
@@ -238,6 +275,117 @@ export async function addMessage(
     throw err;
   }
   return message;
+}
+
+/**
+ * The studio sends (or revises) a quote on a feature request. Moves the
+ * ticket to waiting_client — the ball is with the client to approve or ask.
+ */
+export async function setQuote(
+  id: string,
+  quoteInr: number,
+  quoteNote: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      `UPDATE tickets
+          SET quote_inr = ?, quote_note = ?, quoted_at = ?,
+              status = 'waiting_client', last_sender = 'studio', updated_at = ?
+        WHERE id = ?`
+    )
+    .run(quoteInr, quoteNote.trim().slice(0, 1000), now, now, id);
+}
+
+/**
+ * The client approves the quote — one-way, the acceptance pattern. The
+ * ticket reopens with the client as last sender so it lands back in the
+ * studio's awaiting-reply count: approved work is work to schedule.
+ */
+export async function approveQuote(id: string): Promise<void> {
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      `UPDATE tickets
+          SET approved_at = ?, status = 'open', last_sender = 'client', updated_at = ?
+        WHERE id = ? AND quoted_at IS NOT NULL AND approved_at IS NULL`
+    )
+    .run(now, now, id);
+}
+
+/** Studio-recorded payment against an approved quote. */
+export async function setQuotePaid(id: string, paid: boolean): Promise<void> {
+  getDb()
+    .prepare('UPDATE tickets SET quote_paid_at = ?, updated_at = ? WHERE id = ?')
+    .run(paid ? new Date().toISOString() : null, new Date().toISOString(), id);
+}
+
+export type TicketAttachment = {
+  id: string;
+  ticketId: string;
+  messageId: string;
+  filename: string;
+  mime: string;
+  size: number;
+  /** Absolute path on disk — server-side only, never sent to a page. */
+  path: string;
+  createdAt: string;
+};
+
+type AttachmentRow = {
+  id: string;
+  ticket_id: string;
+  message_id: string;
+  filename: string;
+  mime: string;
+  size: number;
+  path: string;
+  created_at: string;
+};
+
+function toAttachment(row: AttachmentRow): TicketAttachment {
+  return {
+    id: row.id,
+    ticketId: row.ticket_id,
+    messageId: row.message_id,
+    filename: row.filename,
+    mime: row.mime,
+    size: row.size,
+    path: row.path,
+    createdAt: row.created_at,
+  };
+}
+
+export async function insertAttachment(record: TicketAttachment): Promise<void> {
+  getDb()
+    .prepare(
+      `INSERT INTO ticket_attachments (id, ticket_id, message_id, filename, mime, size, path, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      record.id,
+      record.ticketId,
+      record.messageId,
+      record.filename,
+      record.mime,
+      record.size,
+      record.path,
+      record.createdAt
+    );
+}
+
+export async function listAttachments(ticketId: string): Promise<TicketAttachment[]> {
+  const rows = getDb()
+    .prepare('SELECT * FROM ticket_attachments WHERE ticket_id = ? ORDER BY created_at ASC')
+    .all(ticketId) as AttachmentRow[];
+  return rows.map(toAttachment);
+}
+
+export async function getAttachment(id: string): Promise<TicketAttachment | null> {
+  const row = getDb()
+    .prepare('SELECT * FROM ticket_attachments WHERE id = ?')
+    .get(id) as AttachmentRow | undefined;
+  return row ? toAttachment(row) : null;
 }
 
 export async function setTicketStatus(id: string, status: TicketStatus): Promise<void> {

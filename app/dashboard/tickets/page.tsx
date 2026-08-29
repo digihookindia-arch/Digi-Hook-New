@@ -1,5 +1,11 @@
 import Link from 'next/link';
-import { listTickets, TICKET_KIND_LABELS, TICKET_STATUS_LABELS, type TicketStatus } from '@/lib/tickets';
+import {
+  listTickets,
+  PRIORITY_SHORT,
+  TICKET_KIND_LABELS,
+  TICKET_STATUS_LABELS,
+  type TicketStatus,
+} from '@/lib/tickets';
 import { getProject } from '@/lib/portalProjects';
 import { isDbConfigured, dbFile } from '@/lib/db';
 import { requireSession, signOut } from '../actions';
@@ -94,7 +100,14 @@ export default async function TicketsAdminPage() {
                     <span className="mt-1.5 block text-[13.5px] leading-[1.5] text-neutral-700">
                       {project ? project.businessName : 'project removed'} ·{' '}
                       {TICKET_KIND_LABELS[ticket.kind]} ·{' '}
+                      {PRIORITY_SHORT[ticket.priority]} ·{' '}
                       {new Date(ticket.createdAt).toLocaleDateString('en-IN')}
+                      {ticket.quotedAt && !ticket.approvedAt && ticket.status !== 'closed'
+                        ? ' · quote sent, awaiting client'
+                        : ''}
+                      {ticket.approvedAt && !ticket.quotePaidAt
+                        ? ' · quote APPROVED, unpaid'
+                        : ''}
                     </span>
                   </span>
                   <span className="flex flex-none items-center gap-2.5">

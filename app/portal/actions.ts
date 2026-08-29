@@ -23,14 +23,21 @@ import { getProject, type PortalProject } from '@/lib/portalProjects';
 import { supportState } from '@/lib/support';
 import {
   addMessage,
+  approveQuote,
+  ATTACHMENTS_PER_MESSAGE,
+  attachmentProblem,
   cleanBody,
+  cleanHttpUrl,
   cleanSubject,
   createTicket,
   getTicket,
   parseKind,
+  parsePriority,
   setTicketStatus,
   TICKET_KIND_LABELS,
 } from '@/lib/tickets';
+import { saveMessageAttachments } from '@/lib/attachments';
+import { formatInr } from '@/lib/delivery';
 import { portalInviteEmail, ticketReceivedEmail } from '@/lib/portalEmails';
 import { isEmailConfigured, sendEmail, STUDIO_INBOX } from '@/lib/email';
 import { SITE_URL } from '@/lib/site';
@@ -203,6 +210,17 @@ export async function createTicketAction(
   if (!subject) return { error: 'Give the ticket a short subject.' };
   if (!body) return { error: 'Describe what you need in the message.' };
 
+  // Attachments are validated BEFORE anything persists, so a rejected file
+  // never leaves behind a half-submitted ticket the client then duplicates.
+  const files = (formData.getAll('files') as File[]).filter((f) => f && f.size > 0);
+  if (files.length > ATTACHMENTS_PER_MESSAGE) {
+    return { error: `Up to ${ATTACHMENTS_PER_MESSAGE} files per message.` };
+  }
+  for (const file of files) {
+    const problem = attachmentProblem(file.type, file.size);
+    if (problem) return { error: problem };
+  }
+
   // Stamped now, from the window as it stands today. Feature requests are
   // never flagged — they are quotable work regardless of the support plan.
   const outOfSupport =
@@ -216,7 +234,15 @@ export async function createTicketAction(
     subject,
     body,
     outOfSupport,
+    priority: parsePriority(formData.get('priority')),
+    pageUrl: cleanHttpUrl(formData.get('page_url')),
   });
+
+  try {
+    await saveMessageAttachments(ticket.id, ticket.openingMessageId, files);
+  } catch (err) {
+    console.error('[portal] ticket saved, but an attachment failed to store', err);
+  }
 
   // Saved first; the emails are best-effort. Losing a notification is a
   // smaller problem than losing the ticket.
@@ -276,7 +302,23 @@ export async function clientReplyAction(
   const ticket = ticketId ? await getTicket(ticketId) : null;
   if (!ticket || ticket.clientId !== client.id) notFound();
 
-  await addMessage(ticket.id, 'client', body);
+  const files = (formData.getAll('files') as File[]).filter((f) => f && f.size > 0);
+  if (files.length > ATTACHMENTS_PER_MESSAGE) {
+    return { error: `Up to ${ATTACHMENTS_PER_MESSAGE} files per message.` };
+  }
+  for (const file of files) {
+    const problem = attachmentProblem(file.type, file.size);
+    if (problem) return { error: problem };
+  }
+
+  const message = await addMessage(ticket.id, 'client', body);
+  if (message) {
+    try {
+      await saveMessageAttachments(ticket.id, message.id, files);
+    } catch (err) {
+      console.error('[portal] reply saved, but an attachment failed to store', err);
+    }
+  }
   // Answering puts the ball back with the studio: a waiting_client ticket has
   // been answered, and a closed one is being reopened — either way it must
   // land back in the awaiting-reply count, which excludes closed tickets.
@@ -305,4 +347,43 @@ export async function clientReplyAction(
   revalidatePath('/dashboard/tickets');
   revalidatePath(`/dashboard/tickets/${ticket.id}`);
   return {};
+}
+
+/**
+ * The client approves a quoted feature request. One-way, the acceptance
+ * pattern — only a conversation with the studio walks it back. The approval
+ * is timestamped in the database and announced to the studio inbox: exactly
+ * the recorded-against-a-version discipline the portal exists to provide.
+ */
+export async function approveQuoteAction(formData: FormData): Promise<void> {
+  const client = await requireClient();
+  const ticketId = String(formData.get('ticket') ?? '');
+  const ticket = ticketId ? await getTicket(ticketId) : null;
+  if (!ticket || ticket.clientId !== client.id) notFound();
+  if (!ticket.quotedAt || ticket.approvedAt || ticket.quoteInr === null) return;
+
+  await approveQuote(ticket.id);
+
+  try {
+    await sendEmail({
+      to: STUDIO_INBOX,
+      replyTo: client.email,
+      subject: `Quote APPROVED — ${ticket.subject} (${formatInr(ticket.quoteInr)})`,
+      body: [
+        `${client.name} (${client.email}) approved the quote on "${ticket.subject}".`,
+        '',
+        `Amount: ${formatInr(ticket.quoteInr)} + GST`,
+        ticket.quoteNote ? `Scope note: ${ticket.quoteNote}` : '',
+        '',
+        `Schedule it from the dashboard: ${SITE_URL}/dashboard/tickets/${ticket.id}`,
+      ].join('\n'),
+    });
+  } catch (err) {
+    console.error('[portal] approval saved, but studio alert failed', err);
+  }
+
+  revalidatePath(`/portal/${ticket.projectId}/tickets/${ticket.id}`);
+  revalidatePath(`/portal/${ticket.projectId}`);
+  revalidatePath('/dashboard/tickets');
+  revalidatePath(`/dashboard/tickets/${ticket.id}`);
 }

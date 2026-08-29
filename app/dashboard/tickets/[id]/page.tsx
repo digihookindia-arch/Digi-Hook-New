@@ -2,17 +2,22 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   getTicket,
+  listAttachments,
   listMessages,
+  PRIORITY_SHORT,
   TICKET_KIND_LABELS,
   TICKET_STATUSES,
   TICKET_STATUS_LABELS,
 } from '@/lib/tickets';
 import { getProject } from '@/lib/portalProjects';
 import { getClient } from '@/lib/clients';
+import { formatInr } from '@/lib/delivery';
 import { shortReference } from '@/lib/emailTemplate';
 import { requireSession } from '../../actions';
-import { setTicketStatusAction } from '../actions';
+import { setQuotePaidAction, setTicketStatusAction } from '../actions';
 import { StudioReplyForm } from './StudioReplyForm';
+import { QuoteForm } from './QuoteForm';
+import { AttachmentLinks } from '../../../portal/[projectId]/TicketBits';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,9 +34,12 @@ export default async function TicketAdminPage({
 
   // Neither has a foreign key on purpose — a deleted project or account must
   // degrade to a label here, not take the ticket history down with it.
-  const project = await getProject(ticket.projectId);
-  const client = await getClient(ticket.clientId);
-  const messages = await listMessages(ticket.id);
+  const [project, client, messages, attachments] = await Promise.all([
+    getProject(ticket.projectId),
+    getClient(ticket.clientId),
+    listMessages(ticket.id),
+    listAttachments(ticket.id),
+  ]);
 
   return (
     <main>
@@ -49,7 +57,21 @@ export default async function TicketAdminPage({
               {ticket.subject}
             </h1>
             <div className="text-[14.5px] leading-[1.6] text-neutral-800">
-              {TICKET_KIND_LABELS[ticket.kind]} · {shortReference(ticket.id)} ·{' '}
+              {TICKET_KIND_LABELS[ticket.kind]} · {PRIORITY_SHORT[ticket.priority]}{' '}
+              priority · {shortReference(ticket.id)} ·{' '}
+              {ticket.pageUrl ? (
+                <>
+                  <a
+                    href={ticket.pageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-accent-700"
+                  >
+                    affected page
+                  </a>{' '}
+                  ·{' '}
+                </>
+              ) : null}
               {project ? (
                 <Link
                   href={`/dashboard/portal/${project.id}`}
@@ -109,6 +131,44 @@ export default async function TicketAdminPage({
           </div>
         ) : null}
 
+        {/* The quote loop — the studio's half. Feature requests only. */}
+        {ticket.kind === 'feature' ? (
+          <div className="mb-8 grid gap-4">
+            {ticket.quotedAt ? (
+              <div className="flex flex-wrap items-center justify-between gap-4 border-2 border-neutral-300 p-5">
+                <p className="m-0 text-[14.5px] leading-[1.6] text-neutral-800">
+                  Quoted{' '}
+                  <strong className="font-semibold text-text">
+                    {ticket.quoteInr !== null ? formatInr(ticket.quoteInr) : '—'} + GST
+                  </strong>{' '}
+                  on {new Date(ticket.quotedAt).toLocaleDateString('en-IN')} ·{' '}
+                  {ticket.approvedAt
+                    ? `approved by the client on ${new Date(ticket.approvedAt).toLocaleDateString('en-IN')}`
+                    : 'awaiting the client'}
+                  {ticket.quotePaidAt ? ' · PAID' : ''}
+                </p>
+                {ticket.approvedAt ? (
+                  <form action={setQuotePaidAction}>
+                    <input type="hidden" name="id" value={ticket.id} />
+                    <input
+                      type="hidden"
+                      name="paid"
+                      value={ticket.quotePaidAt ? 'no' : 'yes'}
+                    />
+                    <button
+                      type="submit"
+                      className="border-2 border-text px-4 py-3 text-[13.5px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
+                    >
+                      {ticket.quotePaidAt ? 'Unmark paid' : 'Mark paid'}
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            ) : null}
+            <QuoteForm ticket={ticket} />
+          </div>
+        ) : null}
+
         <div className="border-t-2 border-text">
           {messages.map((message) => (
             <div
@@ -130,6 +190,10 @@ export default async function TicketAdminPage({
               <p className="m-0 whitespace-pre-wrap text-[15px] leading-[1.65] text-neutral-800">
                 {message.body}
               </p>
+              <AttachmentLinks
+                attachments={attachments.filter((a) => a.messageId === message.id)}
+                hrefFor={(a) => `/dashboard/tickets/${ticket.id}/file/${a.id}`}
+              />
             </div>
           ))}
         </div>

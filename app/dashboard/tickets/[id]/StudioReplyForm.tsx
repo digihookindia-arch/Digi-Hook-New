@@ -43,6 +43,15 @@ export function StudioReplyForm({ ticketId }: { ticketId: string }) {
         </p>
       ) : null}
 
+      <input
+        name="files"
+        type="file"
+        multiple
+        accept="image/png,image/jpeg,image/webp,application/pdf"
+        aria-label="Attach files to the reply"
+        className="mt-3 w-full border-2 border-neutral-400 bg-bg p-3 text-[13.5px] leading-none text-neutral-800 file:mr-3 file:border-0 file:bg-text file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:uppercase file:text-bg"
+      />
+
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <button
           type="submit"

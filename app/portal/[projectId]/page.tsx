@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { supportState } from '@/lib/support';
+import { formatInr } from '@/lib/delivery';
 import { listAllTicketsForProject, recentActivityForProject } from '@/lib/tickets';
 import { portalProject } from '../actions';
 import { SupportPlanPanel } from './SupportPlanPanel';
@@ -41,7 +42,13 @@ export default async function PortalOverviewPage({
   // "Is any action required from me?" — collected in one strip up top.
   const actions: PendingAction[] = [];
   for (const ticket of tickets) {
-    if (ticket.status === 'waiting_client') {
+    if (ticket.status === 'closed') continue;
+    if (ticket.quotedAt && !ticket.approvedAt && ticket.quoteInr !== null) {
+      actions.push({
+        text: `A quote of ${formatInr(ticket.quoteInr)} awaits your approval — "${ticket.subject}"`,
+        href: `/portal/${project.id}/tickets/${ticket.id}`,
+      });
+    } else if (ticket.status === 'waiting_client') {
       actions.push({
         text: `We're waiting on your reply — "${ticket.subject}"`,
         href: `/portal/${project.id}/tickets/${ticket.id}`,
