@@ -1,4 +1,5 @@
 import type { SearchRow } from '@/lib/searchConsole';
+import type { PsiScores } from '@/lib/pageSpeed';
 
 /**
  * Presentation shared by the live search panel and the monthly report page —
@@ -77,6 +78,27 @@ export function RowsTable({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/**
+ * The four Lighthouse scores as measured by Google PageSpeed — shared by
+ * the locked page and the technical pillar so both read identically. A
+ * null score renders as an em dash, never as zero.
+ */
+export function PsiRow({ scores }: { scores: PsiScores }) {
+  const blocks: [string, number | null][] = [
+    ['SEO', scores.seo],
+    ['Performance', scores.performance],
+    ['Best practices', scores.bestPractices],
+    ['Accessibility', scores.accessibility],
+  ];
+  return (
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,140px),1fr))] gap-x-6 gap-y-5">
+      {blocks.map(([label, score]) => (
+        <Stat key={label} label={label} value={score === null ? '—' : String(score)} sub="out of 100" />
+      ))}
     </div>
   );
 }

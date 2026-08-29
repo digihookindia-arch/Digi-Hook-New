@@ -13,6 +13,7 @@ import {
   createProject,
   deleteProject,
   getProject,
+  setRankLocation,
   updateProjectDetails,
 } from '@/lib/portalProjects';
 import { deleteDocument, saveDocument } from '@/lib/documents';
@@ -28,12 +29,18 @@ import {
 import {
   addActivity,
   addDeliverable,
+  addKeyword,
   deleteActivity,
   deleteDeliverable,
+  deleteKeyword,
   deleteReport,
   generateReport,
   getReport,
   publishReport,
+  runBacklinks,
+  runPageSpeed,
+  runRankChecks,
+  runStanding,
   saveReportText,
   setActivityResult,
   setDeliverableStatus,
@@ -418,4 +425,79 @@ export async function deleteSeoReportAction(formData: FormData): Promise<void> {
     await deleteReport(id, projectId);
     revalidateSeo(projectId);
   }
+}
+
+/* ── SEO measurements (keywords · PSI · ranks · off-page · standing) ──── */
+
+export async function addKeywordAction(
+  _prev: PortalAdminState,
+  formData: FormData
+): Promise<PortalAdminState> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const project = projectId ? await getProject(projectId) : null;
+  if (!project) return { error: 'That project no longer exists.' };
+
+  const outcome = await addKeyword(project.id, formData.get('keyword'));
+  if ('error' in outcome) return { error: outcome.error };
+  revalidateSeo(project.id);
+  return { savedAt: new Date().toISOString() };
+}
+
+export async function deleteKeywordAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const id = String(formData.get('id') ?? '');
+  if (id && projectId) {
+    await deleteKeyword(id, projectId);
+    revalidateSeo(projectId);
+  }
+}
+
+export async function saveRankLocationAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const project = projectId ? await getProject(projectId) : null;
+  if (!project) return;
+  await setRankLocation(project.id, formData.get('location'));
+  revalidateSeo(project.id);
+}
+
+/**
+ * The four measurement buttons share this shape: the slow fetch goes into
+ * `after()` so the action returns immediately, and the vendor-backed ones
+ * run with force — the studio clicked deliberately and the calls cost
+ * cents — while the runners' own spend cap still applies. Outcomes land in
+ * the server log.
+ */
+async function runMeasurement(
+  formData: FormData,
+  label: string,
+  run: (project: NonNullable<Awaited<ReturnType<typeof getProject>>>) => Promise<string>
+): Promise<void> {
+  await requireSession();
+  const projectId = String(formData.get('project') ?? '');
+  const project = projectId ? await getProject(projectId) : null;
+  if (!project) return;
+  after(async () => {
+    const outcome = await run(project);
+    console.info(`[seo] ${label} for ${project.businessName}: ${outcome}`);
+  });
+  revalidateSeo(project.id);
+}
+
+export async function runPageSpeedAction(formData: FormData): Promise<void> {
+  return runMeasurement(formData, 'pagespeed', (project) => runPageSpeed(project));
+}
+
+export async function runRankChecksAction(formData: FormData): Promise<void> {
+  return runMeasurement(formData, 'rank checks', (project) => runRankChecks(project, true));
+}
+
+export async function runBacklinksAction(formData: FormData): Promise<void> {
+  return runMeasurement(formData, 'backlinks', (project) => runBacklinks(project, true));
+}
+
+export async function runStandingAction(formData: FormData): Promise<void> {
+  return runMeasurement(formData, 'standing', (project) => runStanding(project, true));
 }

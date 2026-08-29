@@ -220,6 +220,86 @@ const SCHEMA = `
   CREATE UNIQUE INDEX IF NOT EXISTS seo_reports_month ON seo_reports (project_id, month);
 
   /*
+   * PageSpeed Insights snapshots - the four Lighthouse scores per
+   * measurement. A PSI run takes 15-25s, so pages only ever read the
+   * latest row here; the cron and the dashboard button do the fetching.
+   */
+  CREATE TABLE IF NOT EXISTS seo_pagespeed (
+    id             TEXT PRIMARY KEY,
+    project_id     TEXT NOT NULL,
+    url            TEXT NOT NULL,
+    strategy       TEXT NOT NULL DEFAULT 'mobile',
+    performance    INTEGER,
+    accessibility  INTEGER,
+    best_practices INTEGER,
+    seo            INTEGER,
+    fetched_at     TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS seo_pagespeed_project
+    ON seo_pagespeed (project_id, fetched_at DESC);
+
+  /* Tracked keywords - the studio-agreed list, capped in the action layer. */
+  CREATE TABLE IF NOT EXISTS seo_keywords (
+    id         TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    keyword    TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS seo_keywords_project ON seo_keywords (project_id, created_at);
+
+  /*
+   * One rank check per keyword per run. position NULL means "not in the
+   * top 100" (rendered 100+), never zero. cost_usd is what DataForSEO
+   * reported billing for this call - the ledger stores truth, not
+   * estimates.
+   */
+  CREATE TABLE IF NOT EXISTS seo_rank_checks (
+    id         TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    keyword_id TEXT NOT NULL,
+    checked_on TEXT NOT NULL,
+    position   INTEGER,
+    found_url  TEXT,
+    cost_usd   REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS seo_rank_checks_keyword
+    ON seo_rank_checks (keyword_id, checked_on DESC);
+  CREATE INDEX IF NOT EXISTS seo_rank_checks_project
+    ON seo_rank_checks (project_id, checked_on DESC);
+
+  /* Monthly off-page snapshot: backlink and referring-domain counts. */
+  CREATE TABLE IF NOT EXISTS seo_offpage (
+    id                TEXT PRIMARY KEY,
+    project_id        TEXT NOT NULL,
+    checked_on        TEXT NOT NULL,
+    backlinks         INTEGER NOT NULL DEFAULT 0,
+    referring_domains INTEGER NOT NULL DEFAULT 0,
+    cost_usd          REAL NOT NULL DEFAULT 0,
+    created_at        TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS seo_offpage_project
+    ON seo_offpage (project_id, checked_on DESC);
+
+  /*
+   * Domain standing - "appears in Google's top 100 for N searches" - the
+   * locked page's current-rank headline, refreshed monthly for every
+   * project with a site, subscribed or not.
+   */
+  CREATE TABLE IF NOT EXISTS seo_standing (
+    id              TEXT PRIMARY KEY,
+    project_id      TEXT NOT NULL,
+    checked_on      TEXT NOT NULL,
+    keywords_top100 INTEGER NOT NULL DEFAULT 0,
+    keywords_top10  INTEGER NOT NULL DEFAULT 0,
+    keywords_top3   INTEGER NOT NULL DEFAULT 0,
+    cost_usd        REAL NOT NULL DEFAULT 0,
+    created_at      TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS seo_standing_project
+    ON seo_standing (project_id, checked_on DESC);
+
+  /*
    * Support tickets and feature requests raised from the portal. kind
    * separates the two tabs. out_of_support is stamped at creation from the
    * project's support window - editing the live date later must not rewrite
@@ -418,6 +498,8 @@ export function getDb(): DatabaseSync {
     // Console property the workspace reads (sc-domain: or URL-prefix form).
     addColumnIfMissing(db, 'portal_projects', 'seo_active', 'INTEGER NOT NULL DEFAULT 0');
     addColumnIfMissing(db, 'portal_projects', 'gsc_property', 'TEXT');
+    // SEO-3: where rank checks are localised. Null reads as 'India'.
+    addColumnIfMissing(db, 'portal_projects', 'rank_location', 'TEXT');
     global._dhSqlite = db;
   }
   return global._dhSqlite;

@@ -9,6 +9,8 @@
 
 import {
   AUDIT_ISSUE_CAP,
+  CHECK_LABELS,
+  PILLAR_OF_CHECK,
   analyzePage,
   buildSummary,
   crossPageIssues,
@@ -18,6 +20,8 @@ import {
   pageIssues,
   parseRobots,
   parseSitemapXml,
+  pillarCounts,
+  pillarSummaryLine,
   robotsAllows,
   type PageFacts,
 } from '@/lib/seoAudit';
@@ -26,6 +30,14 @@ import {
   searchWindow,
   shapeSearchRows,
 } from '@/lib/searchConsole';
+import { shapePsiScores } from '@/lib/pageSpeed';
+import {
+  bareHost,
+  hostMatches,
+  shapeBacklinksSummary,
+  shapeDomainStanding,
+  shapeRankResult,
+} from '@/lib/dataForSeo';
 
 let pass = 0;
 let fail = 0;
@@ -341,6 +353,104 @@ check('Google omitting rows entirely is a real empty result, not a failure',
 check('rows of the wrong shape read as unavailable', shapeSearchRows({ rows: 'nope' }) === null);
 check('a non-object payload reads as unavailable', shapeSearchRows('<html>error</html>') === null);
 check('null reads as unavailable', shapeSearchRows(null) === null);
+
+console.log('\n— every check reports under exactly one client-facing pillar —');
+
+const labelKeys = Object.keys(CHECK_LABELS).sort();
+const pillarKeys = Object.keys(PILLAR_OF_CHECK).sort();
+check('the pillar map covers every check', labelKeys.join(',') === pillarKeys.join(','),
+  { missing: labelKeys.filter((k) => !pillarKeys.includes(k)), extra: pillarKeys.filter((k) => !labelKeys.includes(k)) });
+
+const bucketed = pillarCounts([
+  { fingerprint: 'a', severity: 'error', check: 'broken-link', path: '/', detail: '' },
+  { fingerprint: 'b', severity: 'warning', check: 'missing-description', path: '/', detail: '' },
+  { fingerprint: 'c', severity: 'notice', check: 'thin-content', path: '/', detail: '' },
+  { fingerprint: 'd', severity: 'warning', check: 'mixed-content', path: '/', detail: '' },
+]);
+check('technical findings land in technical',
+  bucketed.technical.error === 1 && bucketed.technical.warning === 1);
+check('content findings land in on-page',
+  bucketed.on_page.warning === 1 && bucketed.on_page.notice === 1);
+check('a clean pillar reads as all clear',
+  pillarSummaryLine({ error: 0, warning: 0, notice: 0 }) === 'All clear — nothing needs fixing.');
+check('fixables and notes are counted, never itemised',
+  pillarSummaryLine({ error: 1, warning: 2, notice: 1 }) === '3 items on our fix list and 1 minor note.');
+check('notes alone read as notes',
+  pillarSummaryLine({ error: 0, warning: 0, notice: 2 }) === '2 minor notes.');
+
+console.log('\n— PageSpeed payloads shape into scores, never invented zeros —');
+
+const psi = shapePsiScores({
+  lighthouseResult: {
+    categories: {
+      performance: { score: 0.923 },
+      accessibility: { score: 1 },
+      'best-practices': { score: 0.5 },
+      seo: { score: 0.98 },
+    },
+  },
+});
+check('fractions become 0-100 scores',
+  psi?.performance === 92 && psi?.accessibility === 100 && psi?.bestPractices === 50 && psi?.seo === 98);
+check('a missing category is null, not zero',
+  shapePsiScores({ lighthouseResult: { categories: { seo: { score: 0.9 } } } })?.performance === null);
+check('an out-of-range score is null', shapePsiScores({ lighthouseResult: { categories: { seo: { score: 3 } } } })?.seo === null);
+check('a malformed payload is null overall', shapePsiScores({ error: { code: 500 } }) === null);
+check('a non-object payload is null overall', shapePsiScores('<html>') === null);
+
+console.log('\n— rank results only count the client\'s own site —');
+
+check('www is stripped for matching', bareHost('www.client.in') === 'client.in');
+check('a bare host matches its www form', hostMatches('www.client.in', 'client.in'));
+check('a subdomain counts as the site', hostMatches('blog.client.in', 'client.in'));
+check('a lookalike domain does not', !hostMatches('notclient.in', 'client.in'));
+check('an unrelated host does not', !hostMatches('other.in', 'client.in'));
+
+const serpPayload = (items: unknown[]) => ({
+  cost: 0.0155,
+  tasks: [{ cost: 0.0155, result: [{ items }] }],
+});
+const rank = shapeRankResult(
+  serpPayload([
+    { type: 'paid', rank_group: 1, url: 'https://ad.example/x', domain: 'ad.example' },
+    { type: 'organic', rank_group: 1, url: 'https://other.in/', domain: 'other.in' },
+    { type: 'organic', rank_group: 2, url: 'https://www.client.in/services', domain: 'www.client.in' },
+  ]),
+  'client.in'
+);
+check('the first matching organic result names the position', rank?.position === 2);
+check('the ranking URL travels with it', rank?.url === 'https://www.client.in/services');
+check('the reported API cost is captured', rank?.cost === 0.0155);
+check('ads never count as a ranking',
+  shapeRankResult(serpPayload([{ type: 'paid', rank_group: 1, url: 'https://client.in/', domain: 'client.in' }]), 'client.in')?.position === null);
+check('absent from the top 100 is a successful check with a null position',
+  (() => { const r = shapeRankResult(serpPayload([{ type: 'organic', rank_group: 1, url: 'https://other.in/', domain: 'other.in' }]), 'client.in');
+    return r !== null && r.position === null && r.cost === 0.0155; })());
+check('a domain-less item falls back to its URL host',
+  shapeRankResult(serpPayload([{ type: 'organic', rank_group: 4, url: 'https://client.in/x' }]), 'client.in')?.position === 4);
+check('a malformed SERP payload reads as check-failed, not not-ranked',
+  shapeRankResult({ error: true }, 'client.in') === null);
+
+console.log('\n— off-page and standing snapshots shape honestly —');
+
+const backlinks = shapeBacklinksSummary({
+  cost: 0.02,
+  tasks: [{ result: [{ backlinks: 128, referring_domains: 17 }] }],
+});
+check('backlink counts come through with their cost',
+  backlinks?.backlinks === 128 && backlinks?.referringDomains === 17 && backlinks?.cost === 0.02);
+check('a malformed backlinks payload is null', shapeBacklinksSummary({ tasks: [{ result: [{}] }] }) === null);
+
+const standing = shapeDomainStanding({
+  cost: 0.012,
+  tasks: [{ result: [{ items: [{ metrics: { organic: { pos_1: 2, pos_2_3: 3, pos_4_10: 5, pos_11_20: 4, count: 40 } } }] }] }],
+});
+check('position buckets sum into top-3 and top-10',
+  standing?.keywordsTop3 === 5 && standing?.keywordsTop10 === 10);
+check('the top-100 figure is the tracked count', standing?.keywordsTop100 === 40);
+check('the standing cost is captured', standing?.cost === 0.012);
+check('a payload without items is null', shapeDomainStanding({ tasks: [{ result: [{ items: [] }] }] }) === null);
+check('a malformed standing payload is null', shapeDomainStanding(null) === null);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) process.exitCode = 1;

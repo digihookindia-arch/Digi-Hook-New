@@ -33,6 +33,8 @@ export type PortalProject = {
   seoActive: boolean;
   /** Search Console property the workspace reads (sc-domain: or URL-prefix). */
   gscProperty: string | null;
+  /** Where rank checks are localised. Null reads as India. */
+  rankLocation: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -52,6 +54,7 @@ type Row = {
   stats_token: string | null;
   seo_active: number;
   gsc_property: string | null;
+  rank_location: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -72,6 +75,7 @@ function toProject(row: Row): PortalProject {
     statsToken: row.stats_token ?? null,
     seoActive: row.seo_active === 1,
     gscProperty: row.gsc_property ?? null,
+    rankLocation: row.rank_location ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -113,6 +117,7 @@ export async function createProject(input: {
     statsToken: null,
     seoActive: false,
     gscProperty: null,
+    rankLocation: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -226,6 +231,18 @@ export async function updateProjectDetails(
       new Date().toISOString(),
       id
     );
+}
+
+/**
+ * Where this project's rank checks are localised — edited from the SEO
+ * workbench, not the main project form. Blank stores null, which reads
+ * back as India.
+ */
+export async function setRankLocation(id: string, value: unknown): Promise<void> {
+  const location = String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || null;
+  getDb()
+    .prepare('UPDATE portal_projects SET rank_location = ?, updated_at = ? WHERE id = ?')
+    .run(location, new Date().toISOString(), id);
 }
 
 /** Tickets survive on purpose — there is no FK, and history should outlive a cleanup. */

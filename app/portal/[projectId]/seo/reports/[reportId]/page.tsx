@@ -222,6 +222,74 @@ export default async function SeoReportPage({
         )}
       </section>
 
+      {data.ranks && data.ranks.length > 0 ? (
+        <section className="border-2 border-text p-7">
+          {sectionHeading('Where your keywords ranked')}
+          <table className="w-full border-collapse text-[13.5px] leading-[1.5]">
+            <thead>
+              <tr className="border-b-2 border-text text-left">
+                <th className="py-2 pr-3 font-semibold">Keyword</th>
+                <th className="py-2 pr-3 text-right font-semibold">Month end</th>
+                <th className="py-2 text-right font-semibold">Month start</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.ranks.map((rank) => (
+                <tr key={rank.keyword} className="border-b border-neutral-300">
+                  <td className="py-2 pr-3">{rank.keyword}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums font-semibold">
+                    {rank.position ?? '100+'}
+                  </td>
+                  <td className="py-2 text-right tabular-nums">
+                    {rank.prevPosition === null && rank.position !== null
+                      ? '—'
+                      : (rank.prevPosition ?? '100+')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="m-0 mt-4 text-[12.5px] leading-[1.6] text-neutral-700">
+            Source: live Google results via DataForSEO, checked weekly ·
+            &ldquo;100+&rdquo; means outside the top 100; &ldquo;—&rdquo; means
+            tracking had not started.
+          </p>
+        </section>
+      ) : null}
+
+      {data.offpage ? (
+        <section className="border-2 border-text p-7">
+          {sectionHeading('Off-page: your link profile')}
+          <div className="flex flex-wrap items-baseline gap-x-10 gap-y-3">
+            <div>
+              <span className="font-heading text-[clamp(24px,2.6vw,32px)] font-extrabold leading-none tracking-[-0.03em]">
+                {data.offpage.backlinks.toLocaleString('en-IN')}
+              </span>{' '}
+              <span className="text-[14px] text-neutral-800">
+                backlinks
+                {data.offpage.prevBacklinks !== null
+                  ? ` (was ${data.offpage.prevBacklinks.toLocaleString('en-IN')})`
+                  : ''}
+              </span>
+            </div>
+            <div>
+              <span className="font-heading text-[clamp(24px,2.6vw,32px)] font-extrabold leading-none tracking-[-0.03em]">
+                {data.offpage.referringDomains.toLocaleString('en-IN')}
+              </span>{' '}
+              <span className="text-[14px] text-neutral-800">
+                referring domains
+                {data.offpage.prevReferringDomains !== null
+                  ? ` (was ${data.offpage.prevReferringDomains.toLocaleString('en-IN')})`
+                  : ''}
+              </span>
+            </div>
+          </div>
+          <p className="m-0 mt-4 text-[12.5px] leading-[1.6] text-neutral-700">
+            Source: DataForSEO link index, monthly snapshot.
+          </p>
+        </section>
+      ) : null}
+
       <section className="border-2 border-text p-7">
         {sectionHeading('The work we did, and why')}
         {data.activities.length === 0 ? (

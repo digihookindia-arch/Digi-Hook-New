@@ -131,6 +131,46 @@ export function waitingDays(waitingSince: string | null, now = new Date()): numb
   return Math.max(0, Math.floor((now.getTime() - since) / 86_400_000));
 }
 
+/* ── tracked keywords and rank movement ────────────────────────────────── */
+
+/** The plan's scope: one site, up to this many tracked keywords. */
+export const KEYWORDS_CAP = 15;
+
+/** A tracked keyword as typed, cleaned — or null when nothing usable remains. */
+export function cleanKeyword(value: unknown): string | null {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  return text === '' ? null : text;
+}
+
+/**
+ * The comparison point for "vs ~30 days back": among checks at least 21
+ * days older than the latest one, the one closest to 30 days before it.
+ * Null while the history is too young — the panel then says "tracking
+ * since …" instead of inventing a movement figure.
+ */
+export function movementBaseline(
+  history: { checkedOn: string; position: number | null }[]
+): { checkedOn: string; position: number | null } | null {
+  const latest = history[0];
+  if (!latest || history.length < 2) return null;
+  const day = 86_400_000;
+  const latestMs = Date.parse(latest.checkedOn);
+  const target = latestMs - 30 * day;
+
+  let best: (typeof history)[number] | null = null;
+  let bestDistance = Infinity;
+  for (const check of history.slice(1)) {
+    const ms = Date.parse(check.checkedOn);
+    if (!Number.isFinite(ms) || latestMs - ms < 21 * day) continue;
+    const distance = Math.abs(ms - target);
+    if (distance < bestDistance) {
+      best = check;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
 /* ── months ────────────────────────────────────────────────────────────── */
 
 export function isMonthKey(value: unknown): value is string {
@@ -227,6 +267,19 @@ export type SeoReportData = {
   activities: ReportActivity[];
   deliverablesDone: ReportDeliverable[];
   deliverablesOpen: ReportDeliverable[];
+  /**
+   * Tracked-keyword positions at month end vs month start. Optional — added
+   * after the first reports shipped, so older stored reports lack it and
+   * must keep rendering (the annexure pattern).
+   */
+  ranks?: null | { keyword: string; position: number | null; prevPosition: number | null }[];
+  /** Off-page snapshot for the month vs the one before. Optional, as above. */
+  offpage?: null | {
+    backlinks: number;
+    referringDomains: number;
+    prevBacklinks: number | null;
+    prevReferringDomains: number | null;
+  };
 };
 
 /** Applies the caps and freezes the shape. Nulls pass through untouched. */
@@ -243,6 +296,8 @@ export function assembleReportData(input: SeoReportData): SeoReportData {
     activities: input.activities.slice(0, REPORT_ACTIVITY_CAP),
     deliverablesDone: input.deliverablesDone,
     deliverablesOpen: input.deliverablesOpen,
+    ranks: input.ranks ?? null,
+    offpage: input.offpage ?? null,
   };
 }
 

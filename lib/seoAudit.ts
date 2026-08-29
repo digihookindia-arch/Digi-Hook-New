@@ -76,6 +76,77 @@ export const SEVERITY_LABELS: Record<IssueSeverity, string> = {
   notice: 'Notice',
 };
 
+/* ── pillars ───────────────────────────────────────────────────────────── */
+
+export type SeoPillar = 'technical' | 'on_page';
+
+/**
+ * Which pillar each check reports under. The portal shows clients pillar
+ * summaries ONLY — counts and an all-clear/fix-list line, never itemised
+ * issue dumps (the studio built these sites; a "broken links" list on the
+ * client's own screen contradicts the basic-SEO promise that shipped with
+ * the build). The itemised view lives in the dashboard.
+ *
+ * Every check in CHECK_LABELS must appear here — the test suite pins the
+ * two key sets against each other so a new check cannot silently vanish
+ * from both pillars.
+ */
+export const PILLAR_OF_CHECK: Record<string, SeoPillar> = {
+  unreachable: 'technical',
+  'robots-blocked': 'technical',
+  'noindex-in-sitemap': 'technical',
+  'broken-link': 'technical',
+  'sitemap-redirect': 'technical',
+  'canonical-missing': 'technical',
+  'canonical-mismatch': 'technical',
+  'mixed-content': 'technical',
+  'bad-jsonld': 'technical',
+  orphan: 'technical',
+  'missing-title': 'on_page',
+  'long-title': 'on_page',
+  'duplicate-title': 'on_page',
+  'missing-description': 'on_page',
+  'long-description': 'on_page',
+  'duplicate-description': 'on_page',
+  'h1-count': 'on_page',
+  'heading-skip': 'on_page',
+  'images-alt': 'on_page',
+  'thin-content': 'on_page',
+  'no-lang': 'on_page',
+  'no-og-image': 'on_page',
+};
+
+export type PillarCounts = Record<SeoPillar, Record<IssueSeverity, number>>;
+
+/** Issue list → per-pillar severity counts. Unknown checks land in technical. */
+export function pillarCounts(issues: AuditIssue[]): PillarCounts {
+  const counts: PillarCounts = {
+    technical: { error: 0, warning: 0, notice: 0 },
+    on_page: { error: 0, warning: 0, notice: 0 },
+  };
+  for (const found of issues) {
+    counts[PILLAR_OF_CHECK[found.check] ?? 'technical'][found.severity]++;
+  }
+  return counts;
+}
+
+/**
+ * The client-facing sentence for one pillar — counts only, by design.
+ * Errors and warnings are "on our fix list"; notices are "minor notes".
+ */
+export function pillarSummaryLine(counts: Record<IssueSeverity, number>): string {
+  const fixing = counts.error + counts.warning;
+  if (fixing === 0 && counts.notice === 0) {
+    return 'All clear — nothing needs fixing.';
+  }
+  const parts: string[] = [];
+  if (fixing > 0) parts.push(`${fixing} item${fixing === 1 ? '' : 's'} on our fix list`);
+  if (counts.notice > 0) {
+    parts.push(`${counts.notice} minor note${counts.notice === 1 ? '' : 's'}`);
+  }
+  return parts.join(' and ') + '.';
+}
+
 /* ── robots.txt ────────────────────────────────────────────────────────── */
 
 export type RobotsRules = {

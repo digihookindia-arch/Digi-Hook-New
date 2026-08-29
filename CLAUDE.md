@@ -110,7 +110,7 @@ design system). Read the relevant block there before changing a page's markup.
 | `app/` | 16 public routes + `sitemap.ts` / `robots.ts` / `opengraph-image.tsx` per segment; `dashboard/`, `proposals/`, `portal/` |
 | `content/` | All copy as typed modules. Edit copy here, never in JSX. |
 | `components/` | Shared chrome + `ServicePage` / `DeepPage` / `PageHero` / `Accordion` / `CtaBand` / `ArticleLayout` |
-| `lib/` | `site.ts` (company facts), `seo.ts`, `jsonld.tsx`, `og.tsx`, `enquiry.ts`, `enquiries.ts`, `proposals.ts`, `db.ts`, `email.ts`, `auth.ts`, `claude.ts`, `clients.ts`, `portalProjects.ts`, `support.ts`, `tickets.ts` / `ticketRules.ts`, `portalEmails.ts`, `seoAudit.ts` / `seoAudits.ts`, `searchConsole.ts`, `seoWork.ts` / `seoRecords.ts` |
+| `lib/` | `site.ts` (company facts), `seo.ts`, `jsonld.tsx`, `og.tsx`, `enquiry.ts`, `enquiries.ts`, `proposals.ts`, `db.ts`, `email.ts`, `auth.ts`, `claude.ts`, `clients.ts`, `portalProjects.ts`, `support.ts`, `tickets.ts` / `ticketRules.ts`, `portalEmails.ts`, `seoAudit.ts` / `seoAudits.ts`, `searchConsole.ts`, `seoWork.ts` / `seoRecords.ts`, `pageSpeed.ts`, `dataForSeo.ts` |
 | `scripts/` | `seo-check.mjs` — the crawler behind `npm run seo` |
 
 Shared page layouts exist — check `components/` before hand-rolling new page markup.
@@ -323,11 +323,22 @@ ticket-plus-first-message).
 - **Documents tab**: studio shares invoices/scope/handover from
   `/dashboard/portal/<id>` (`lib/documents.ts`, same allow-list and storage split
   as attachments); clients read-only.
-- **SEO & Growth tab (SEO-1, 2026-08-29)** — always visible, two states:
-  `seo_active` on the project flips it from a truthful locked preview
-  ("SEO-ready foundation; ongoing SEO is a separate growth service" — and
-  **never promise a ranking or a traffic figure, anywhere**) to the workspace.
-  No price appears on the locked page — the commercial call is still open.
+- **SEO & Growth tab** — always visible, two states via `seo_active`
+  (**never promise a ranking or a traffic figure, anywhere**):
+  - *Locked (SEO-3 reshape, user's direction 2026-08-29)*: a sales page with
+    live proof — the domain's Google standing ("appears in the top 100 for N
+    searches", DataForSEO Labs) and the four PageSpeed scores — a short
+    four-pillar read, and the plan at **₹6,000/month + GST** (the price call
+    is made; that exact wording).
+  - *Workspace*: four pillars — Google ranking (tracked keywords vs ~30 days
+    back), Search performance (GSC), Technical (PageSpeed + crawl summary),
+    On-page (crawl summary), Off-page (backlink snapshot) — then the work
+    record. **Clients see pillar summaries only, never itemised issue
+    lists** (user's explicit call: we built these sites; a "broken links"
+    list contradicts the basic-SEO promise). `PILLAR_OF_CHECK` /
+    `pillarCounts` in `lib/seoAudit.ts` do the bucketing, and the test suite
+    pins that map against `CHECK_LABELS`; the itemised view renders only in
+    the dashboard workbench.
   - **Search Console panel** (`lib/searchConsole.ts`): service-account JWT
     signed with node:crypto (no SDK), `GSC_KEY_FILE` env points at the JSON
     key; the account's client_email must be added as a user on each property
@@ -379,6 +390,26 @@ ticket-plus-first-message).
     on-screen text first, refuses a summary under 40 chars
     (`publishProblem`), then emails the client best-effort. Clients see
     published reports only — drafts 404.
+  - **SEO-3 real data**: `lib/pageSpeed.ts` (PageSpeed Insights — a run
+    takes 15–25s, so pages ONLY read stored `seo_pagespeed` snapshots,
+    refreshed by cron/button; the keyless quota 429s in practice, so
+    `PAGESPEED_API_KEY` is required for reliability) and `lib/dataForSeo.ts`
+    (dormant until `DATAFORSEO_LOGIN`/`PASSWORD` — live SERP rank checks at
+    depth 100 per tracked keyword, weekly; monthly backlinks summary;
+    monthly Labs domain standing, fetched for EVERY project with a site
+    because the locked page's headline needs it). Rank positions use
+    `rank_group` (organic position, what rank trackers report), never
+    `rank_absolute`; "not in top 100" is position NULL rendered "100+",
+    never 0. Every vendor row stores the `cost` USD the API itself reported;
+    `monthVendorSpendUsd` + a $38/site/month backstop stop calls if
+    something misconfigures (budget: user approved $40; real usage is $1–2).
+    Keywords: `seo_keywords`, cap 15 (`KEYWORDS_CAP`), per-project
+    `rank_location` (null = India). The ~30-day comparison is
+    `movementBaseline` — the check nearest 30 days back, ≥21 days old, else
+    "—". `/api/cron/seo-data` runs DAILY (crontab 03:50) with per-source
+    freshness guards inside the runners (PSI >20h, ranks >6d,
+    standing/backlinks >27d), so a failed day retries and cadences live in
+    code, not in the crontab.
 - **Renewal reminders**: `/api/cron/reminders` (daily VPS crontab, guarded by
   `CRON_SECRET` — unset = route plays dead) sends 30/15/7/1-day and at-expiry
   emails for both windows. One send per band per window end-date

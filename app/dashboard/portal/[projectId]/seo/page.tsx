@@ -4,6 +4,7 @@ import { ExternalLink, Play, Trash2 } from 'lucide-react';
 import { getProject } from '@/lib/portalProjects';
 import { latestAudit } from '@/lib/seoAudits';
 import { isSearchConsoleConfigured } from '@/lib/searchConsole';
+import { isRankDataConfigured } from '@/lib/dataForSeo';
 import {
   DELIVERABLE_STATUSES,
   DELIVERABLE_STATUS_LABELS,
@@ -12,18 +13,35 @@ import {
   previousMonthKey,
   waitingDays,
 } from '@/lib/seoWork';
-import { listActivities, listDeliverables, listReports } from '@/lib/seoRecords';
+import {
+  latestPageSpeed,
+  latestStanding,
+  listActivities,
+  listDeliverables,
+  listKeywords,
+  listOffpage,
+  listReports,
+  monthVendorSpendUsd,
+} from '@/lib/seoRecords';
 import { requireSession } from '../../../actions';
 import {
   addSeoDeliverableAction,
+  deleteKeywordAction,
   deleteSeoActivityAction,
   deleteSeoDeliverableAction,
   deleteSeoReportAction,
+  runBacklinksAction,
+  runPageSpeedAction,
+  runRankChecksAction,
   runSeoAuditAction,
+  runStandingAction,
+  saveRankLocationAction,
   setActivityResultAction,
   setDeliverableStatusAction,
 } from '../../actions';
 import { ActivityForm } from './ActivityForm';
+import { AuditDetail } from './AuditDetail';
+import { KeywordForm } from './KeywordForm';
 import { GenerateReportForm, ReportEditor } from './ReportTools';
 
 export const dynamic = 'force-dynamic';
@@ -48,13 +66,20 @@ export default async function SeoAdminPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [audit, activities, deliverables, reports] = await Promise.all([
-    latestAudit(project.id),
-    listActivities(project.id, 20),
-    listDeliverables(project.id),
-    listReports(project.id),
-  ]);
+  const [audit, activities, deliverables, reports, psi, keywords, standing, offpage, spend] =
+    await Promise.all([
+      latestAudit(project.id),
+      listActivities(project.id, 20),
+      listDeliverables(project.id),
+      listReports(project.id),
+      latestPageSpeed(project.id),
+      listKeywords(project.id),
+      latestStanding(project.id),
+      listOffpage(project.id, 1),
+      monthVendorSpendUsd(project.id),
+    ]);
   const doneCount = deliverables.filter((d) => d.status === 'done').length;
+  const vendorReady = isRankDataConfigured();
 
   return (
     <main>
@@ -109,23 +134,156 @@ export default async function SeoAdminPage({
                     ? `last attempt failed (${new Date(audit.startedAt).toLocaleDateString('en-IN')}) — check the server log.`
                     : `${new Date(audit.startedAt).toLocaleDateString('en-IN')} · ${audit.pages} pages · ${audit.errors} critical, ${audit.warnings} warnings, ${audit.notices} notices.`}
             </div>
+            <div>
+              <span className="font-semibold">PageSpeed:</span>{' '}
+              {psi
+                ? `measured ${new Date(psi.fetchedAt).toLocaleString('en-IN')} · SEO ${psi.scores.seo ?? '—'} · performance ${psi.scores.performance ?? '—'}.`
+                : 'no measurement yet — the daily cron or the button below takes one.'}
+            </div>
+            <div>
+              <span className="font-semibold">DataForSEO:</span>{' '}
+              {!vendorReady ? (
+                'credentials not set — ranks, standing and backlinks show "being connected". Add DATAFORSEO_LOGIN/PASSWORD to the server env.'
+              ) : (
+                <>
+                  connected · this month&apos;s spend ${spend.toFixed(2)} ·{' '}
+                  {standing
+                    ? `standing checked ${new Date(standing.checkedOn).toLocaleDateString('en-IN')}`
+                    : 'standing not checked yet'}{' '}
+                  ·{' '}
+                  {offpage[0]
+                    ? `backlinks checked ${new Date(offpage[0].checkedOn).toLocaleDateString('en-IN')}.`
+                    : 'backlinks not checked yet.'}
+                </>
+              )}
+            </div>
           </div>
           {project.siteUrl ? (
-            <form action={runSeoAuditAction}>
-              <input type="hidden" name="project" value={project.id} />
-              <button
-                type="submit"
-                className="inline-flex items-center gap-2 border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
-              >
-                <Play size={14} aria-hidden="true" />
-                Run audit now
-              </button>
-            </form>
+            <div className="flex flex-wrap gap-3">
+              <form action={runSeoAuditAction}>
+                <input type="hidden" name="project" value={project.id} />
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
+                >
+                  <Play size={14} aria-hidden="true" />
+                  Run audit now
+                </button>
+              </form>
+              <form action={runPageSpeedAction}>
+                <input type="hidden" name="project" value={project.id} />
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
+                >
+                  <Play size={14} aria-hidden="true" />
+                  Measure PageSpeed
+                </button>
+              </form>
+              {vendorReady ? (
+                <>
+                  <form action={runStandingAction}>
+                    <input type="hidden" name="project" value={project.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-2 border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
+                    >
+                      <Play size={14} aria-hidden="true" />
+                      Refresh standing
+                    </button>
+                  </form>
+                  <form action={runRankChecksAction}>
+                    <input type="hidden" name="project" value={project.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-2 border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
+                    >
+                      <Play size={14} aria-hidden="true" />
+                      Check ranks now
+                    </button>
+                  </form>
+                  <form action={runBacklinksAction}>
+                    <input type="hidden" name="project" value={project.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-2 border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
+                    >
+                      <Play size={14} aria-hidden="true" />
+                      Refresh backlinks
+                    </button>
+                  </form>
+                </>
+              ) : null}
+            </div>
           ) : (
             <p className="m-0 text-[13.5px] leading-[1.6] text-neutral-700">
-              Set the live site URL on the project page to enable audits.
+              Set the live site URL on the project page to enable measurements.
             </p>
           )}
+          <p className="m-0 mt-3 text-[12.5px] leading-[1.55] text-neutral-700">
+            Buttons run in the background — refresh the page in a minute for
+            results. The daily cron keeps all of this fresh on its own.
+          </p>
+        </div>
+
+        {/* Tracked keywords */}
+        <h2 className="m-0 mb-4 font-heading text-[22px] font-bold leading-[1.2] tracking-[-0.025em]">
+          Tracked keywords
+        </h2>
+        <div className="mb-4">
+          <KeywordForm projectId={project.id} count={keywords.length} />
+        </div>
+        {keywords.length > 0 ? (
+          <div className="mb-4 border-t-2 border-text">
+            {keywords.map((keyword) => (
+              <div
+                key={keyword.id}
+                className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-neutral-300 py-3"
+              >
+                <span className="text-[14.5px] font-medium leading-[1.4]">{keyword.keyword}</span>
+                <form action={deleteKeywordAction}>
+                  <input type="hidden" name="project" value={project.id} />
+                  <input type="hidden" name="id" value={keyword.id} />
+                  <button type="submit" className={smallButton}>
+                    Remove
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="m-0 mb-4 text-[14px] leading-[1.6] text-neutral-700">
+            No keywords yet — the client&apos;s ranking panel says the list is
+            being finalised until some exist.
+          </p>
+        )}
+        <form
+          action={saveRankLocationAction}
+          className="mb-9 flex flex-wrap items-center gap-3"
+        >
+          <input type="hidden" name="project" value={project.id} />
+          <label className="flex flex-wrap items-center gap-3 text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+            Rank location
+            <input
+              name="location"
+              type="text"
+              defaultValue={project.rankLocation ?? ''}
+              placeholder="India"
+              className="border-2 border-neutral-400 bg-bg p-3 text-[14px] font-normal normal-case leading-none tracking-normal text-text"
+            />
+          </label>
+          <button type="submit" className={smallButton}>
+            Save location
+          </button>
+          <span className="text-[12.5px] normal-case text-neutral-700">
+            A DataForSEO location name — a country (&ldquo;India&rdquo;) or a
+            city (&ldquo;Delhi,India&rdquo;). Blank means India.
+          </span>
+        </form>
+
+        {/* Itemised audit findings — never shown to the client */}
+        <div className="mb-9">
+          <AuditDetail projectId={project.id} />
         </div>
 
         {/* Activity log */}

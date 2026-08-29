@@ -133,16 +133,7 @@ export async function SearchPerformancePanel({ project }: { project: PortalProje
         />
       </div>
 
-      {data.pagesInSearch > 0 ? (
-        <p className="m-0 mt-6 text-[14px] leading-[1.6] text-neutral-800">
-          <span className="font-semibold">{data.pagesInSearch.toLocaleString('en-IN')}</span>{' '}
-          {data.pagesInSearch === 1 ? 'page' : 'pages'} of your site appeared in
-          Google results this window
-          {data.pagesInSearch >= 1000 ? ' (counted up to 1,000)' : ''}.
-        </p>
-      ) : null}
-
-      <p className="m-0 mt-2 text-[12.5px] leading-[1.6] text-neutral-700">
+      <p className="m-0 mt-6 text-[12.5px] leading-[1.6] text-neutral-700">
         &ldquo;Avg. position&rdquo; is Google&apos;s average across every search
         your site appeared in — it moves with which searches happen, not only
         with your rankings.

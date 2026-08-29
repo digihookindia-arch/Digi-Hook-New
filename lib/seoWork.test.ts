@@ -11,9 +11,11 @@ import {
   ACTIVITY_FIELD_MAX,
   assembleReportData,
   cleanActivity,
+  cleanKeyword,
   isMonthKey,
   monthBounds,
   monthLabel,
+  movementBaseline,
   parseDeliverableStatus,
   parseSeoCategory,
   previousMonthKey,
@@ -135,6 +137,44 @@ check('publishing without a summary is refused', publishProblem({ summary: '' })
 check('a token summary is still refused', publishProblem({ summary: 'Good month.' }) !== null);
 check('a real summary publishes',
   publishProblem({ summary: 'Clicks grew steadily on the back of the services-page rewrite; February focuses on the location pages.' }) === null);
+check('rank and off-page sections default to null on old reports',
+  assembleReportData({ ...baseData, search: null }).ranks === null &&
+    assembleReportData({ ...baseData, search: null }).offpage === null);
+check('rank and off-page sections pass through when present',
+  (() => { const withRanks = assembleReportData({
+      ...baseData,
+      ranks: [{ keyword: 'web design noida', position: 8, prevPosition: 14 }],
+      offpage: { backlinks: 40, referringDomains: 9, prevBacklinks: 30, prevReferringDomains: 7 },
+    });
+    return withRanks.ranks?.[0]?.position === 8 && withRanks.offpage?.referringDomains === 9; })());
+
+console.log('\n— tracked keywords and the ~30-day comparison —');
+
+check('a keyword is trimmed and collapsed', cleanKeyword('  web   design  noida ') === 'web design noida');
+check('an empty keyword is null', cleanKeyword('   ') === null);
+check('a keyword is capped at 80 chars', (cleanKeyword('x'.repeat(200)) ?? '').length === 80);
+
+const history = [
+  { checkedOn: '2026-08-29', position: 6 },
+  { checkedOn: '2026-08-22', position: 8 },
+  { checkedOn: '2026-08-01', position: 11 },
+  { checkedOn: '2026-07-25', position: 14 },
+  { checkedOn: '2026-06-20', position: 20 },
+];
+check('the baseline is the check nearest ~30 days back',
+  movementBaseline(history)?.checkedOn === '2026-08-01');
+check('checks under 21 days old never serve as the baseline',
+  movementBaseline([
+    { checkedOn: '2026-08-29', position: 6 },
+    { checkedOn: '2026-08-22', position: 8 },
+  ]) === null);
+check('one lonely check has no baseline', movementBaseline([{ checkedOn: '2026-08-29', position: 6 }]) === null);
+check('an empty history has no baseline', movementBaseline([]) === null);
+check('a not-ranked baseline keeps its null position',
+  movementBaseline([
+    { checkedOn: '2026-08-29', position: 6 },
+    { checkedOn: '2026-07-29', position: null },
+  ])?.position === null);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) process.exitCode = 1;
