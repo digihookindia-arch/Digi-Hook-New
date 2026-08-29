@@ -122,7 +122,10 @@ export async function RankingPanel({ project }: { project: PortalProject }) {
     <section aria-labelledby="seo-ranking" className="border-2 border-text p-7">
       {kicker('seo-ranking', 'Google ranking')}
 
-      {!isRankDataConfigured() ? (
+      {/* Data first: recorded checks always render, even if the vendor
+          connection later lapses — dated history is honest. The notes cover
+          the truly empty states. */}
+      {checked.length === 0 && !isRankDataConfigured() ? (
         <p className={noteClass}>
           Connecting live rank tracking — positions plot here the moment real
           checks run. No placeholder numbers, ever.
@@ -355,7 +358,8 @@ export async function OffpagePanel({ project }: { project: PortalProject }) {
     <section aria-labelledby="seo-offpage" className="border-2 border-text p-7">
       {kicker('seo-offpage', 'Off-page SEO')}
 
-      {!isRankDataConfigured() ? (
+      {/* Data first, same as the ranking panel. */}
+      {!latest && !isRankDataConfigured() ? (
         <p className={noteClass}>
           Connecting the link index — backlink and referring-domain counts plot
           here once the first real snapshot lands.
