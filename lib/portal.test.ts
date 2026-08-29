@@ -19,7 +19,10 @@ import {
   verifySetPasswordToken,
   createSessionToken,
   verifySessionToken,
+  createOAuthStateToken,
+  verifyOAuthStateToken,
 } from '@/lib/auth';
+import { validateGoogleClaims } from '@/lib/googleAuth';
 import { supportState } from '@/lib/support';
 import {
   parseKind,
@@ -139,6 +142,39 @@ const project = (totalInr: number | null, paidInr: number): PortalProject => ({
 check('no total means no balance', balanceInr(project(null, 500)) === null);
 check('balance is total minus paid', balanceInr(project(100000, 20000)) === 80000);
 check('overpayment clamps to zero', balanceInr(project(100000, 120000)) === 0);
+
+console.log('\n— Google sign-in trusts only what it minted and what Google verified —');
+
+check('an OAuth state token round-trips', verifyOAuthStateToken(createOAuthStateToken()));
+check('a missing state is rejected', !verifyOAuthStateToken(undefined));
+check('a tampered state is rejected',
+  !verifyOAuthStateToken(createOAuthStateToken().slice(0, -2) + 'xx'));
+check('a client session token is not a valid state',
+  !verifyOAuthStateToken(createClientSessionToken('client-a')));
+
+const CID = 'test-client-id.apps.googleusercontent.com';
+const goodClaims = {
+  aud: CID,
+  iss: 'https://accounts.google.com',
+  email: 'Client@Example.com',
+  email_verified: 'true',
+};
+check('valid claims yield the normalised email',
+  validateGoogleClaims(goodClaims, CID) === 'client@example.com');
+check('the short issuer form is accepted',
+  validateGoogleClaims({ ...goodClaims, iss: 'accounts.google.com' }, CID) === 'client@example.com');
+check('a token minted for another app is rejected',
+  validateGoogleClaims({ ...goodClaims, aud: 'someone-else' }, CID) === null);
+check('a non-Google issuer is rejected',
+  validateGoogleClaims({ ...goodClaims, iss: 'https://evil.example' }, CID) === null);
+check('an unverified email is rejected',
+  validateGoogleClaims({ ...goodClaims, email_verified: 'false' }, CID) === null);
+check('a boolean email_verified is accepted',
+  validateGoogleClaims({ ...goodClaims, email_verified: true }, CID) === 'client@example.com');
+check('a missing email is rejected',
+  validateGoogleClaims({ ...goodClaims, email: undefined }, CID) === null);
+check('an empty configured client id rejects everything',
+  validateGoogleClaims(goodClaims, '') === null);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) process.exitCode = 1;

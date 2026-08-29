@@ -185,3 +185,24 @@ export function verifySetPasswordToken(
     return null;
   return Number(expires) > Date.now() ? clientId : null;
 }
+
+/**
+ * OAuth state token for the portal's "Continue with Google" flow:
+ * expires.signature over a 'gauth:' prefixed payload. Round-trips through
+ * Google's redirect as the `state` parameter, so the callback only honours
+ * flows this server started recently — CSRF protection without a session.
+ */
+const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
+
+export function createOAuthStateToken(): string {
+  const expires = Date.now() + OAUTH_STATE_MAX_AGE_MS;
+  return `${expires}.${sign(`gauth:${expires}`)}`;
+}
+
+export function verifyOAuthStateToken(token: string | undefined): boolean {
+  if (!token) return false;
+  const [expires, signature] = token.split('.');
+  if (!expires || !signature) return false;
+  if (!safeEqual(signature, sign(`gauth:${expires}`))) return false;
+  return Number(expires) > Date.now();
+}

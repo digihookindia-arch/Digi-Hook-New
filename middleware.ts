@@ -12,7 +12,13 @@ import { CLIENT_COOKIE, SESSION_COOKIE } from '@/lib/cookies';
  */
 
 /** Portal pages a signed-out visitor must be able to reach. */
-const PORTAL_PUBLIC = ['/portal/login', '/portal/forgot', '/portal/set-password'];
+const PORTAL_PUBLIC = [
+  '/portal/login',
+  '/portal/forgot',
+  '/portal/set-password',
+  '/portal/google',
+  '/portal/google/callback',
+];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

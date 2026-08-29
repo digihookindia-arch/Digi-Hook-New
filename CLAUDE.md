@@ -266,6 +266,14 @@ ticket-plus-first-message).
   `requireClient()` / `portalProject()` in **every** page and action — same rule as
   `requireSession()`, do not remove as redundant. Sign-in, forgot and set-password never
   reveal whether an email has an account.
+- **Google sign-in** (`lib/googleAuth.ts`, `app/portal/google/`) is an *alternative
+  door, not a signup path*: the OIDC code flow only proves which email the visitor
+  owns, the callback matches it against an existing client and turns everyone else
+  away. State is HMAC-signed **and** bound to a `dh_gstate` cookie; the ID token is
+  verified via Google's tokeninfo endpoint (fine at portal volume). Off — button not
+  rendered — until `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set. The two
+  `/portal/google` routes are in the middleware's public list, or the flow could
+  never start.
 - **Accounts are invite-only** — the studio creates them from `/dashboard/portal`
   (account + project + invite email in one form; an email that already has an account
   gets the new project added to it). No self-signup, no rate limiting, no honeypot —

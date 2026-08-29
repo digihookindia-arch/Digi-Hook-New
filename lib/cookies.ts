@@ -25,3 +25,8 @@ export const CLIENT_COOKIE = 'dh_client';
 
 /** How long a signed-in portal client stays signed in. */
 export const CLIENT_SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+
+/** The Google OAuth state cookie — binds a "Continue with Google" flow to
+ *  the browser that started it. Lives here because Next route files may only
+ *  export HTTP methods, and both /portal/google routes need the name. */
+export const GSTATE_COOKIE = 'dh_gstate';
