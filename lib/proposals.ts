@@ -1,5 +1,7 @@
 import { randomUUID, randomInt } from 'crypto';
 import { getDb } from './db';
+import { cleanGstin, cleanStateCode } from './gst';
+import { DEFAULT_GST_PERCENT, cleanGstPercent } from './money';
 import {
   parseAssets,
   parseMilestones,
@@ -95,6 +97,29 @@ export type Proposal = {
    */
   clientEmail: string;
   clientPhone: string;
+  /**
+   * The GST rate this proposal is billed at, as a whole percent.
+   *
+   * Every figure in `content` is exclusive of GST, so this is what turns a
+   * quoted price into a payable one on the Payment tab and on a receipt. It
+   * lives on the row rather than in a constant because the rate that applied
+   * when a client signed is a fact about that proposal — a later change to the
+   * prevailing rate must not restate what was already agreed. Rows stored
+   * before this column read back as 18%, which is what they were priced at.
+   */
+  gstPercent: number;
+  /**
+   * Billing identity, used only by the GST tax invoice.
+   *
+   * `clientState` is a GST state code (see `lib/gst.ts`) and is the place of
+   * supply — it decides CGST/SGST versus IGST, so a proposal without one
+   * cannot be invoiced and the dashboard says which field is missing rather
+   * than the system picking a state. `clientGstin` is optional: an unregistered
+   * client is a perfectly ordinary B2C supply.
+   */
+  clientAddress: string;
+  clientGstin: string;
+  clientState: string | null;
   createdAt: string;
   updatedAt: string;
   /**
@@ -138,6 +163,10 @@ type Row = {
   budget: string | null;
   client_email: string | null;
   client_phone: string | null;
+  gst_percent: number | null;
+  client_address: string | null;
+  client_gstin: string | null;
+  client_state: string | null;
   created_at: string;
   updated_at: string;
   assets: string;
@@ -158,6 +187,10 @@ function toProposal(row: Row): Proposal {
     budget: row.budget ?? '',
     clientEmail: row.client_email ?? '',
     clientPhone: row.client_phone ?? '',
+    gstPercent: cleanGstPercent(row.gst_percent ?? DEFAULT_GST_PERCENT),
+    clientAddress: row.client_address ?? '',
+    clientGstin: row.client_gstin ?? '',
+    clientState: row.client_state ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     acceptedAt: row.accepted_at ?? null,
@@ -196,8 +229,9 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
       `INSERT INTO proposals
          (slug, client, access_code, content, brief, created_at, updated_at,
           assets, milestones, stages, accepted_at, assets_shared_at, budget,
-          client_email, client_phone)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          client_email, client_phone, gst_percent, client_address,
+          client_gstin, client_state)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(slug) DO UPDATE SET
          client      = excluded.client,
          access_code = excluded.access_code,
@@ -211,7 +245,11 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
          assets_shared_at = excluded.assets_shared_at,
          budget      = excluded.budget,
          client_email = excluded.client_email,
-         client_phone = excluded.client_phone`
+         client_phone = excluded.client_phone,
+         gst_percent  = excluded.gst_percent,
+         client_address = excluded.client_address,
+         client_gstin = excluded.client_gstin,
+         client_state = excluded.client_state`
     )
     .run(
       proposal.slug,
@@ -228,7 +266,15 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
       proposal.assetsSharedAt,
       proposal.budget,
       proposal.clientEmail,
-      proposal.clientPhone
+      proposal.clientPhone,
+      // Cleaned rather than bound raw: SQLite refuses an undefined parameter
+      // outright, and a proposal object assembled from an older shape (a
+      // restored backup, a fixture) would otherwise fail to save at all
+      // instead of taking the default rate the read path already assumes.
+      cleanGstPercent(proposal.gstPercent),
+      proposal.clientAddress ?? '',
+      proposal.clientGstin ?? '',
+      proposal.clientState ?? null
     );
 }
 
@@ -247,6 +293,28 @@ export async function setProposalAccepted(
 }
 
 /**
+ * Sets the client's billing identity — the address, GSTIN and state that a tax
+ * invoice needs. Its own narrow write, like the others: this is what a client's
+ * accountant reads off the invoice, and a proposal revision regenerating
+ * `content` has no business touching it.
+ */
+export async function setProposalBilling(
+  slug: string,
+  billing: { address: string; gstin: string; state: string | null }
+): Promise<void> {
+  getDb()
+    .prepare(
+      'UPDATE proposals SET client_address = ?, client_gstin = ?, client_state = ? WHERE slug = ?'
+    )
+    .run(
+      billing.address.trim().slice(0, 400),
+      cleanGstin(billing.gstin) ?? '',
+      cleanStateCode(billing.state),
+      slug
+    );
+}
+
+/**
  * Corrects the client's contact details. Its own narrow write, like the two
  * above: a proposal revision regenerates `content` from Claude, and must never
  * be able to overwrite the address a client asked us to use.
@@ -258,6 +326,46 @@ export async function setProposalContact(
   getDb()
     .prepare('UPDATE proposals SET client_email = ?, client_phone = ? WHERE slug = ?')
     .run(contact.email.trim(), contact.phone.trim(), slug);
+}
+
+/**
+ * Sets the GST rate this proposal bills at. Its own narrow write, like the
+ * three above: the rate is money, and a proposal revision that regenerates
+ * `content` has no business changing what the client is taxed.
+ */
+export async function setProposalGst(slug: string, percent: number): Promise<void> {
+  getDb()
+    .prepare('UPDATE proposals SET gst_percent = ? WHERE slug = ?')
+    .run(cleanGstPercent(percent), slug);
+}
+
+/**
+ * Marks one milestone paid, in place, after a payment has actually settled.
+ *
+ * Narrower than `saveDelivery` on purpose. The studio's delivery editor holds
+ * a whole copy of the three lists in React state; if a client pays while that
+ * screen is open, a save from it would otherwise revert the row that was just
+ * settled. This touches one field of one row and leaves everything else as it
+ * was found — including a row already marked paid by hand, which stays paid.
+ *
+ * Position is identity in the milestones array (see `lib/delivery.ts`), so an
+ * index past the end is a no-op rather than an append.
+ */
+export async function markMilestonePaid(
+  slug: string,
+  index: number
+): Promise<void> {
+  const proposal = await getProposal(slug);
+  if (!proposal) return;
+  const milestone = proposal.milestones[index];
+  if (!milestone || milestone.status === 'paid') return;
+
+  const milestones = proposal.milestones.map((m, i) =>
+    i === index ? { ...m, status: 'paid' as const } : m
+  );
+  getDb()
+    .prepare('UPDATE proposals SET milestones = ?, updated_at = ? WHERE slug = ?')
+    .run(JSON.stringify(milestones), new Date().toISOString(), slug);
 }
 
 /**

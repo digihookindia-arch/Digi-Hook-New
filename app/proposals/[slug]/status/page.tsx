@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { unlockedProposal } from '@/lib/proposalAccess';
-import { MilestonesView, StagesView } from '@/components/DeliveryView';
+import { StagesView } from '@/components/DeliveryView';
 import { LockedNotice } from '../LockedNotice';
 
 export const dynamic = 'force-dynamic';
@@ -22,13 +22,8 @@ export default async function ProposalStatusPage({
   // holds when the URL is typed directly.
   if (!proposal.acceptedAt) return <LockedNotice slug={slug} />;
 
-  return (
-    <>
-      <StagesView stages={proposal.stages} />
-      <MilestonesView
-        milestones={proposal.milestones}
-        total={proposal.content.total}
-      />
-    </>
-  );
+  // Work only. The payment schedule moved to its own tab when online payment
+  // arrived — two copies of the same money on adjacent tabs is how a client
+  // ends up reading a stale one.
+  return <StagesView stages={proposal.stages} />;
 }

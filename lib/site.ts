@@ -83,6 +83,39 @@ export const site = {
     opens: '10:00',
     closes: '19:00',
   },
+  /**
+   * GSTIN, printed on client-facing proposals and on every tax invoice.
+   *
+   * Load bearing, not decorative: `issueInvoice` refuses to raise a tax
+   * invoice without it and the client gets a plain receipt instead. Its first
+   * two digits are the state code and must agree with `gstStateCode` below —
+   * that pair is what decides CGST+SGST versus IGST on every invoice.
+   *
+   * Supplied by the client 2026-09-06.
+   */
+  gstin: '09CDJPK2530B1ZX' as string | null,
+
+  /**
+   * The studio's own GST state, as a GST state code. Uttar Pradesh is 09, and
+   * it is what decides whether a supply is CGST+SGST or IGST — so it is a fact
+   * about the registered address above, not a preference. If the GSTIN is ever
+   * filled in, its first two digits must match this.
+   */
+  gstStateCode: '09',
+
+  /**
+   * SAC (service accounting code) printed on tax invoices. 998314 is the
+   * government's code for "information technology (IT) design and development
+   * services". Confirmed by the client for website work, 2026-09-06.
+   *
+   * One code for every line, because every line is website work. If the studio
+   * ever invoices something genuinely different under this system — a pure
+   * media buy, say, or standalone photography — that sits under a different
+   * SAC and this constant is no longer enough: the code would have to move
+   * onto the line item rather than the company. Nothing here guesses which.
+   */
+  sacCode: '998314',
+
   builtWith: 'Engineered in Next.js, TypeScript and Tailwind CSS.',
 } as const;
 

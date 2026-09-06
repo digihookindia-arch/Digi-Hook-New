@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
-import { Check } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, Check } from 'lucide-react';
 import { unlockedProposal } from '@/lib/proposalAccess';
+import { formatDocDate } from '@/lib/proposalDoc';
 import { ProposalView } from '@/components/ProposalView';
 import { AcceptProposal } from './AcceptProposal';
 
@@ -24,26 +26,36 @@ export default async function ProposalPage({
 
   return (
     <>
-      <ProposalView content={proposal.content} milestones={proposal.milestones} />
+      <ProposalView
+        content={proposal.content}
+        milestones={proposal.milestones}
+        gstPercent={proposal.gstPercent}
+      />
 
       {proposal.acceptedAt ? (
-        <div className="mt-12 flex flex-wrap items-baseline gap-x-3 gap-y-2 border-2 border-accent-600 p-6">
-          <Check size={17} strokeWidth={3} aria-hidden="true" className="self-center text-accent" />
-          <p className="m-0 text-[15px] font-semibold leading-[1.5]">
-            Accepted on{' '}
-            {new Date(proposal.acceptedAt).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
-            .
-          </p>
-          <p className="m-0 text-[14px] leading-[1.5] text-neutral-700">
+        <section className="mt-[clamp(44px,6vw,76px)] overflow-hidden rounded-panel bg-panel p-[clamp(24px,4vw,44px)] shadow-panel">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent-600 text-white">
+              <Check size={17} strokeWidth={3} aria-hidden="true" />
+            </span>
+            <h2 className="m-0 font-heading text-[clamp(21px,2.4vw,30px)] font-bold leading-[1.12] tracking-[-0.03em]">
+              Accepted on {formatDocDate(proposal.acceptedAt)}
+            </h2>
+          </div>
+          <p className="m-0 mb-6 max-w-[56ch] text-[15.5px] leading-[1.65] text-neutral-800">
             {proposal.assetsSharedAt
-              ? 'The tabs above are open — “What we need” lists everything we need from you.'
-              : 'The tabs above are now open. We will post the list of what we need from you within 24 hours.'}
+              ? 'The other three stages are open — “What we need” lists everything we need from you, and “Payment” carries the schedule and your receipts.'
+              : 'The other three stages are open. We will post the list of what we need from you within 24 hours.'}
           </p>
-        </div>
+          <Link
+            href={`/proposals/${slug}/payment`}
+            data-print-hide
+            className="inline-flex min-h-[48px] items-center gap-2.5 rounded-panel-sm bg-text px-5 text-[14.5px] font-semibold leading-none text-bg transition-opacity hover:opacity-90"
+          >
+            Go to payment
+            <ArrowRight size={15} strokeWidth={2.5} aria-hidden="true" />
+          </Link>
+        </section>
       ) : (
         <AcceptProposal slug={slug} />
       )}

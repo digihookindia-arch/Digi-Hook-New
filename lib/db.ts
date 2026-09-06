@@ -46,9 +46,98 @@ const SCHEMA = `
     assets_shared_at TEXT,
     budget      TEXT NOT NULL DEFAULT '',
     client_email TEXT NOT NULL DEFAULT '',
-    client_phone TEXT NOT NULL DEFAULT ''
+    client_phone TEXT NOT NULL DEFAULT '',
+    gst_percent INTEGER NOT NULL DEFAULT 18,
+    client_address TEXT NOT NULL DEFAULT '',
+    client_gstin TEXT NOT NULL DEFAULT '',
+    client_state TEXT
   );
   CREATE INDEX IF NOT EXISTS proposals_created_at ON proposals (created_at DESC);
+
+  /*
+   * Online payments taken against a proposal's milestones (Razorpay).
+   *
+   * One row per attempt, never updated in place beyond its own status -
+   * a payment ledger that loses its failures is not a ledger. The row is
+   * written before the client is sent to the checkout, so an abandoned
+   * attempt leaves a 'created' row that the webhook or the next page load
+   * can reconcile rather than a silent gap.
+   *
+   * Amounts are whole rupees and are split three ways on purpose: subtotal
+   * is what the proposal quoted, gst_inr is the tax added at gst_percent,
+   * and amount_inr is what was actually charged. A receipt has to be able to
+   * state all three, and recomputing tax from a total after a rate change
+   * would restate history.
+   *
+   * milestone_index is the position in the proposal's milestones array -
+   * position is identity there (see lib/delivery.ts) - so milestone_label is
+   * stored beside it as the human record, which survives a reordering that
+   * the index would not.
+   */
+  CREATE TABLE IF NOT EXISTS payments (
+    id              TEXT PRIMARY KEY,
+    proposal_slug   TEXT NOT NULL,
+    milestone_index INTEGER NOT NULL,
+    milestone_indexes TEXT NOT NULL DEFAULT '',
+    milestone_label TEXT NOT NULL,
+    subtotal_inr    INTEGER NOT NULL,
+    gst_percent     INTEGER NOT NULL,
+    gst_inr         INTEGER NOT NULL,
+    amount_inr      INTEGER NOT NULL,
+    order_id        TEXT NOT NULL UNIQUE,
+    payment_id      TEXT,
+    method          TEXT,
+    status          TEXT NOT NULL DEFAULT 'created',
+    failure_reason  TEXT NOT NULL DEFAULT '',
+    receipt         TEXT NOT NULL,
+    created_at      TEXT NOT NULL,
+    paid_at         TEXT
+  );
+  CREATE INDEX IF NOT EXISTS payments_proposal ON payments (proposal_slug, created_at DESC);
+  /*
+   * GST tax invoices, one per settled payment.
+   *
+   * Everything the invoice states is frozen here at issue time - the
+   * supplier's GSTIN, the client's name, address and GSTIN, the place of
+   * supply, and the tax split. A tax invoice is a legal record of what was
+   * stated on a date; re-deriving any of it from today's proposal row would
+   * silently rewrite history the first time a client corrects their address.
+   *
+   * number is the human series (DH/26-27/0007) and must be unique and
+   * consecutive within its financial year, hence the UNIQUE index and the
+   * (fy, sequence) pair the allocator reads. payment_id is UNIQUE too: one
+   * payment can only ever be invoiced once.
+   *
+   * Amounts are whole rupees. cgst_inr + sgst_inr + igst_inr always equals the
+   * whole tax; one side of that pair is always zero, decided by comparing
+   * place_of_supply against the supplier's own state (see lib/gst.ts).
+   */
+  CREATE TABLE IF NOT EXISTS invoices (
+    id               TEXT PRIMARY KEY,
+    number           TEXT NOT NULL UNIQUE,
+    financial_year   TEXT NOT NULL,
+    sequence         INTEGER NOT NULL,
+    payment_id       TEXT NOT NULL UNIQUE,
+    proposal_slug    TEXT NOT NULL,
+    issued_at        TEXT NOT NULL,
+    supplier_gstin   TEXT NOT NULL,
+    supplier_state   TEXT NOT NULL,
+    client_name      TEXT NOT NULL,
+    client_address   TEXT NOT NULL,
+    client_gstin     TEXT,
+    place_of_supply  TEXT NOT NULL,
+    description      TEXT NOT NULL,
+    sac_code         TEXT NOT NULL,
+    taxable_inr      INTEGER NOT NULL,
+    gst_percent      INTEGER NOT NULL,
+    cgst_inr         INTEGER NOT NULL DEFAULT 0,
+    sgst_inr         INTEGER NOT NULL DEFAULT 0,
+    igst_inr         INTEGER NOT NULL DEFAULT 0,
+    total_inr        INTEGER NOT NULL,
+    emailed_at       TEXT
+  );
+  CREATE INDEX IF NOT EXISTS invoices_proposal ON invoices (proposal_slug, issued_at DESC);
+  CREATE INDEX IF NOT EXISTS invoices_year ON invoices (financial_year, sequence DESC);
 
   /*
    * Enquiries from the public contact form. The answers column is the pruned
@@ -500,6 +589,22 @@ export function getDb(): DatabaseSync {
     addColumnIfMissing(db, 'portal_projects', 'gsc_property', 'TEXT');
     // SEO-3: where rank checks are localised. Null reads as 'India'.
     addColumnIfMissing(db, 'portal_projects', 'rank_location', 'TEXT');
+    // Proposals now quote ex-GST and add tax on the payment tab, so the rate
+    // lives on the row rather than in a constant: a rate change must not
+    // restate what an already-signed proposal quoted. Older rows read back as
+    // the 18% default, which is what they were priced against.
+    addColumnIfMissing(db, 'proposals', 'gst_percent', 'INTEGER NOT NULL DEFAULT 18');
+    // Billing identity, for the GST invoice. The state code is what decides
+    // CGST/SGST versus IGST, so a proposal without one cannot be invoiced -
+    // the dashboard says so rather than the system guessing a place of supply.
+    addColumnIfMissing(db, 'proposals', 'client_address', "TEXT NOT NULL DEFAULT ''");
+    addColumnIfMissing(db, 'proposals', 'client_gstin', "TEXT NOT NULL DEFAULT ''");
+    addColumnIfMissing(db, 'proposals', 'client_state', 'TEXT');
+    // A payment can settle several milestones at once - the "everything due"
+    // button. milestone_index keeps the first, for the older index-based
+    // queries; this is the full set. Rows written before it read back as the
+    // single index they already carry.
+    addColumnIfMissing(db, 'payments', 'milestone_indexes', "TEXT NOT NULL DEFAULT ''");
     global._dhSqlite = db;
   }
   return global._dhSqlite;

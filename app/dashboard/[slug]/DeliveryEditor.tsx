@@ -9,14 +9,20 @@ import {
   MILESTONE_STATUSES,
   STAGE_LABELS,
   STAGE_STATUSES,
+  cleanDueDate,
   formatInr,
   milestoneAmountValues,
+  milestoneSchedule,
   parseAmount,
+  scheduleTotals,
+  todayIso,
+  totalDue,
   totalPercent,
   type AssetItem,
   type Milestone,
   type WorkStage,
 } from '@/lib/delivery';
+import { cleanGstPercent, gstOn } from '@/lib/money';
 import { saveDeliveryAction, type DeliveryState } from '../actions';
 import { Label, Panel, RowShell, inputClass } from './EditorKit';
 
@@ -34,16 +40,20 @@ export function DeliveryEditor({
   initialAssets,
   initialMilestones,
   initialStages,
+  initialGstPercent,
 }: {
   slug: string;
   total: string;
   initialAssets: AssetItem[];
   initialMilestones: Milestone[];
   initialStages: WorkStage[];
+  /** The rate this proposal bills at. Posted separately from the three lists. */
+  initialGstPercent: number;
 }) {
   const [assets, setAssets] = useState(initialAssets);
   const [milestones, setMilestones] = useState(initialMilestones);
   const [stages, setStages] = useState(initialStages);
+  const [gstPercent, setGstPercent] = useState(initialGstPercent);
 
   const [state, action, pending] = useActionState(
     saveDeliveryAction,
@@ -77,6 +87,13 @@ export function DeliveryEditor({
   // add up to. Percent-mode rows with no figure count as 0 here on purpose.
   const amountSum = amountValues.reduce((sum: number, n) => sum + (n ?? 0), 0);
   const pureShares = milestones.every((m) => m.amount === null);
+  // What the client will actually be charged, row by row — the figure the
+  // Payment tab puts on a button, so the studio sees it before they do.
+  const rate = cleanGstPercent(gstPercent);
+  const today = todayIso();
+  const schedule = milestoneSchedule(total, milestones, rate);
+  const scheduleTotal = scheduleTotals(schedule);
+  const dueNow = totalDue(schedule);
 
   return (
     <form action={action}>
@@ -86,6 +103,9 @@ export function DeliveryEditor({
         name="delivery"
         value={JSON.stringify({ assets, milestones, stages })}
       />
+      {/* Its own column, not part of the delivery JSON — the tax rate is not a
+          list, and `saveDelivery` writes only the three lists on purpose. */}
+      <input type="hidden" name="gstPercent" value={rate} />
 
       <Panel
         title="What we need from the client"
@@ -205,15 +225,50 @@ export function DeliveryEditor({
 
       <Panel
         title="Payment schedule"
-        hint="Starts at the standard 20 / 30 / 50 split, with amounts worked out from the proposal total. Edit the share to keep that, or type an exact amount to fix a rupee figure for a payment — the last one you touched wins for that row."
+        hint="Starts at the standard 20 / 30 / 50 split, with amounts worked out from the proposal total. Edit the share to keep that, or type an exact amount to fix a rupee figure for a payment — the last one you touched wins for that row. Every figure here is exclusive of GST; the rate below is what the client is charged on top."
         addLabel="Add a payment"
         onAdd={() =>
           setMilestones((rows) => [
             ...rows,
-            { label: '', percent: 0, status: 'pending', note: '', amount: null },
+            {
+              label: '',
+              percent: 0,
+              status: 'pending',
+              note: '',
+              amount: null,
+              dueDate: null,
+            },
           ])
         }
       >
+        {/* The tax rate, alongside the money it is charged on. Almost always
+            18% — it is a field rather than a constant because the rate that
+            applied when a client signed must not move under them later. */}
+        <div className="border-b border-neutral-300 p-[18px]">
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
+            <label className="block flex-[0_1_160px]">
+              <Label>GST rate</Label>
+              <div className="flex items-stretch gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={40}
+                  className={inputClass}
+                  value={gstPercent}
+                  onChange={(e) => setGstPercent(Number(e.target.value))}
+                />
+                <span className="inline-flex items-center text-[14px] font-semibold leading-none text-neutral-700">
+                  %
+                </span>
+              </div>
+            </label>
+            <p className="m-0 flex-[1_1_260px] text-[13px] leading-[1.55] text-neutral-700">
+              {scheduleTotal
+                ? `The client is billed ${formatInr(scheduleTotal.payable)} in total — ${formatInr(scheduleTotal.subtotal)} plus ${formatInr(scheduleTotal.gst)} GST.${dueNow ? ` ${formatInr(dueNow.payable)} of that has reached its due date and is what the client is being asked to pay now.` : ' Nothing has reached its due date yet.'}`
+                : `The proposal total is not a single figure, so no payable amount can be worked out. Type exact amounts on the rows below to make the schedule payable online.`}
+            </p>
+          </div>
+        </div>
         {milestones.map((milestone, i) => (
           <RowShell
             key={i}
@@ -295,6 +350,19 @@ export function DeliveryEditor({
                 </div>
               </label>
               <label className="block">
+                <Label>Due date</Label>
+                <input
+                  type="date"
+                  className={inputClass}
+                  value={milestone.dueDate ?? ''}
+                  onChange={(e) =>
+                    patch(setMilestones, i, {
+                      dueDate: cleanDueDate(e.target.value),
+                    })
+                  }
+                />
+              </label>
+              <label className="block">
                 <Label>Status</Label>
                 <select
                   className={inputClass}
@@ -322,9 +390,18 @@ export function DeliveryEditor({
               />
             </label>
             <div className="mt-3 text-[13px] leading-[1.5] text-neutral-700">
-              {amounts[i]
-                ? `Client sees ${amounts[i]}${milestone.amount !== null ? ' — a fixed figure; the share follows it' : ''}, excluding GST.`
+              {schedule[i]?.payableText
+                ? `Client pays ${schedule[i]?.payableText} — ${amounts[i]} plus ${rate}% GST${milestone.amount !== null ? ', a fixed figure the share follows' : ''}.`
                 : `The proposal total (${total}) is not a single figure, so the client sees the percentage only. Type an exact amount to show rupees.`}
+              {/* A dated row past its date is collected with everything else
+                  due, and its own button on the client's page is disabled. */}
+              {milestone.dueDate && milestone.status !== 'paid'
+                ? milestone.dueDate <= today
+                  ? ' It has passed its due date, so it is in the client’s total due now.'
+                  : ' The client can pay it early if they want to.'
+                : milestone.status !== 'paid'
+                  ? ' No due date, so it never joins the total due — set one to start chasing it.'
+                  : ''}
             </div>
           </RowShell>
         ))}

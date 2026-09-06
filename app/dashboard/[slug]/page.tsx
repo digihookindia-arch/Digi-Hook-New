@@ -3,6 +3,11 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, ChevronRight, Trash2, ExternalLink } from 'lucide-react';
 import { getProposalJourney } from '@/lib/journey';
 import { isEmailConfigured } from '@/lib/email';
+import { listInvoices } from '@/lib/invoices';
+import { listPayments } from '@/lib/payments';
+import { isRazorpayConfigured, isWebhookConfigured } from '@/lib/razorpay';
+import { BillingForm } from './BillingForm';
+import { PaymentsLedger } from './PaymentsLedger';
 import { ProposalView } from '@/components/ProposalView';
 import { ClientUpdates } from '@/components/ClientUpdates';
 import {
@@ -32,6 +37,8 @@ export default async function EditProposalPage({
   const journey = await getProposalJourney(slug);
   if (!journey?.proposal) notFound();
   const { proposal } = journey;
+  const payments = await listPayments(slug);
+  const invoices = await listInvoices(slug);
 
   return (
     <main>
@@ -306,6 +313,23 @@ export default async function EditProposalPage({
             initialAssets={proposal.assets}
             initialMilestones={proposal.milestones}
             initialStages={proposal.stages}
+            initialGstPercent={proposal.gstPercent}
+          />
+        </div>
+
+        <div className="mb-11 border-t-2 border-text pt-8">
+          <div className="mb-6 text-[12px] font-semibold uppercase leading-none tracking-[0.14em] text-accent-700">
+            Payments and tax invoices
+          </div>
+          <div className="mb-7">
+            <BillingForm proposal={proposal} />
+          </div>
+          <PaymentsLedger
+            slug={proposal.slug}
+            payments={payments}
+            invoices={invoices}
+            gatewayLive={isRazorpayConfigured()}
+            webhookLive={isWebhookConfigured()}
           />
         </div>
 
@@ -313,7 +337,11 @@ export default async function EditProposalPage({
           <div className="mb-6 text-[12px] font-semibold uppercase leading-none tracking-[0.14em] text-accent-700">
             Preview
           </div>
-          <ProposalView content={proposal.content} milestones={proposal.milestones} />
+          <ProposalView
+            content={proposal.content}
+            milestones={proposal.milestones}
+            gstPercent={proposal.gstPercent}
+          />
         </div>
       </div>
     </main>

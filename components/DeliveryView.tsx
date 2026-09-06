@@ -1,12 +1,8 @@
 import { Check, Circle, Loader } from 'lucide-react';
 import {
   ASSET_LABELS,
-  MILESTONE_LABELS,
   STAGE_LABELS,
-  milestoneAmounts,
-  totalPercent,
   type AssetItem,
-  type Milestone,
   type WorkStage,
 } from '@/lib/delivery';
 
@@ -14,37 +10,59 @@ import {
  * The client-facing render of the studio's delivery records. Read-only by
  * design — nothing on these pages writes. The client sees where things stand;
  * the studio moves them from the dashboard.
+ *
+ * Money is deliberately not here. The payment schedule lives in
+ * `components/PaymentView.tsx`, on its own stage, because it gained a pay
+ * button, GST and a receipt ledger — and because two renderings of the same
+ * schedule on adjacent stages is how a client ends up reading a stale one.
  */
 
 type Tone = 'done' | 'active' | 'waiting';
 
 function StatusPill({ tone, children }: { tone: Tone; children: React.ReactNode }) {
-  // white on accent-600 measures 4.74:1 and passes AA; bare accent would not.
+  // White on accent-600 measures 4.74:1 and passes AA; bare accent would not.
   const styles: Record<Tone, string> = {
-    done: 'border-accent-600 bg-accent-600 text-white',
-    active: 'border-accent-600 text-accent-700',
-    waiting: 'border-neutral-400 text-neutral-700',
+    done: 'bg-accent-600 text-white',
+    active: 'bg-accent-100 text-accent-700',
+    waiting: 'bg-surface text-neutral-700',
   };
   return (
     <span
-      className={`inline-flex min-h-[24px] items-center border-2 px-2.5 text-[11px] font-semibold uppercase leading-none tracking-[0.1em] ${styles[tone]}`}
+      className={`inline-flex min-h-[24px] items-center rounded-full px-2.5 text-[11px] font-semibold uppercase leading-none tracking-[0.1em] ${styles[tone]}`}
     >
       {children}
     </span>
   );
 }
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
+/** The stage header, matching the numbered sections of the proposal itself. */
+function StageHeading({
+  number,
+  title,
+  lead,
+}: {
+  number: string;
+  title: string;
+  lead: string;
+}) {
   return (
-    <h2 className="m-0 mb-4 font-heading text-[clamp(20px,2.2vw,28px)] font-bold leading-[1.15] tracking-[-0.028em]">
-      {children}
-    </h2>
+    <>
+      <div className="mb-3 text-[13px] font-extrabold uppercase leading-none tracking-[0.16em] text-accent-700">
+        {number}
+      </div>
+      <h2 className="m-0 font-heading text-[clamp(24px,3vw,38px)] font-extrabold leading-[1.06] tracking-[-0.035em]">
+        {title}
+      </h2>
+      <p className="m-0 mt-5 max-w-[64ch] text-[clamp(15.5px,1.6vw,17.5px)] leading-[1.7] text-neutral-800">
+        {lead}
+      </p>
+    </>
   );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <p className="m-0 border-2 border-neutral-300 p-6 text-[15px] leading-[1.6] text-neutral-700">
+    <p className="m-0 mt-8 rounded-panel bg-panel p-6 text-[15px] leading-[1.6] text-neutral-700 shadow-panel">
       {children}
     </p>
   );
@@ -57,57 +75,63 @@ export function AssetsView({ assets }: { assets: AssetItem[] }) {
 
   return (
     <section>
-      <SectionHeading>What we need from you</SectionHeading>
-      <p className="m-0 mb-7 max-w-[62ch] text-[15.5px] leading-[1.65] text-neutral-800">
-        {assets.length === 0
-          ? 'We will list anything we need from you here as the project starts.'
-          : outstanding === 0
-            ? 'Everything we asked for has arrived. Nothing is waiting on you.'
-            : `${outstanding} of ${assets.length} ${outstanding === 1 ? 'item is' : 'items are'} still with you. Send whatever is ready — you do not have to send it all at once.`}
-      </p>
+      <StageHeading
+        number="02"
+        title="What we need from you"
+        lead={
+          assets.length === 0
+            ? 'We will list anything we need from you here as the project starts.'
+            : outstanding === 0
+              ? 'Everything we asked for has arrived. Nothing is waiting on you.'
+              : `${outstanding} of ${assets.length} ${outstanding === 1 ? 'item is' : 'items are'} still with you. Send whatever is ready — you do not have to send it all at once.`
+        }
+      />
 
       {assets.length === 0 ? (
         <Empty>Nothing to collect yet.</Empty>
       ) : (
-        <div className="border-t-2 border-text">
+        <ul className="m-0 mt-9 grid list-none gap-3.5 p-0">
           {assets.map((asset, i) => (
-            <div
-              key={`${asset.label}-${i}`}
-              className="grid grid-cols-[28px_minmax(0,1fr)] gap-3 border-b border-neutral-300 py-5"
-            >
-              {asset.status === 'received' ? (
-                <Check
-                  size={17}
-                  strokeWidth={3}
-                  aria-hidden="true"
-                  className="mt-[3px] text-accent"
-                />
-              ) : (
-                <Circle
-                  size={15}
-                  strokeWidth={2.5}
-                  aria-hidden="true"
-                  className="mt-[4px] text-neutral-500"
-                />
-              )}
-              <div>
-                <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2">
-                  <h3 className="m-0 font-heading text-[17px] font-bold leading-[1.2] tracking-[-0.02em]">
-                    {asset.label}
-                  </h3>
-                  <StatusPill tone={asset.status === 'received' ? 'done' : 'waiting'}>
-                    {ASSET_LABELS[asset.status]}
-                  </StatusPill>
+            <li key={`${asset.label}-${i}`}>
+              <div className="break-inside-avoid rounded-panel bg-panel p-[clamp(18px,2.5vw,26px)] shadow-panel">
+                <div className="grid grid-cols-[30px_minmax(0,1fr)] gap-3">
+                  {asset.status === 'received' ? (
+                    <Check
+                      size={18}
+                      strokeWidth={3}
+                      aria-hidden="true"
+                      className="mt-[3px] text-accent"
+                    />
+                  ) : (
+                    <Circle
+                      size={16}
+                      strokeWidth={2.5}
+                      aria-hidden="true"
+                      className="mt-[4px] text-neutral-500"
+                    />
+                  )}
+                  <div>
+                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2">
+                      <h3 className="m-0 font-heading text-[17.5px] font-bold leading-[1.2] tracking-[-0.025em]">
+                        {asset.label}
+                      </h3>
+                      <StatusPill
+                        tone={asset.status === 'received' ? 'done' : 'waiting'}
+                      >
+                        {ASSET_LABELS[asset.status]}
+                      </StatusPill>
+                    </div>
+                    {asset.detail ? (
+                      <p className="m-0 max-w-[62ch] text-[14.5px] leading-[1.65] text-neutral-800">
+                        {asset.detail}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-                {asset.detail ? (
-                  <p className="m-0 max-w-[60ch] text-[14.5px] leading-[1.6] text-neutral-800">
-                    {asset.detail}
-                  </p>
-                ) : null}
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </section>
   );
@@ -120,163 +144,93 @@ export function StagesView({ stages }: { stages: WorkStage[] }) {
   const percent = stages.length ? Math.round((done / stages.length) * 100) : 0;
 
   return (
-    <section className="mb-11">
-      <SectionHeading>Where the work has got to</SectionHeading>
+    <section>
+      <StageHeading
+        number="03"
+        title="Where the work has got to"
+        lead="Every stage of the build, updated as it moves. If something here looks out of date, tell us — this page is only as good as we keep it."
+      />
 
       {stages.length === 0 ? (
         <Empty>We will track the stages here once the project starts.</Empty>
       ) : (
         <>
-          <div className="mb-7">
-            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1">
-              <span className="text-[13px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+          <div className="mt-9 rounded-panel bg-text p-[clamp(20px,3vw,28px)] text-bg shadow-lift">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+              <span className="text-[11px] font-semibold uppercase leading-none tracking-[0.16em] text-accent-400">
                 {done} of {stages.length} stages complete
               </span>
-              <span className="font-heading text-[19px] font-extrabold leading-none tracking-[-0.02em] text-accent-700">
+              <span className="font-heading text-[clamp(26px,3.5vw,38px)] font-extrabold leading-none tracking-[-0.04em]">
                 {percent}%
               </span>
             </div>
             {/* Decorative fill, no text on it — bare accent is fine here. */}
             <div
-              className="h-2 w-full bg-neutral-200"
+              className="h-2.5 w-full overflow-hidden rounded-full bg-neutral-700"
               role="img"
               aria-label={`${percent} percent complete`}
             >
-              <div className="h-full bg-accent" style={{ width: `${percent}%` }} />
+              <div
+                className="h-full rounded-full bg-accent"
+                style={{ width: `${percent}%` }}
+              />
             </div>
           </div>
 
-          <div className="border-t-2 border-text">
+          <ol className="m-0 mt-4 grid list-none gap-3.5 p-0">
             {stages.map((stage, i) => (
-              <div
-                key={`${stage.label}-${i}`}
-                className="grid grid-cols-[52px_minmax(0,1fr)] gap-4 border-b border-neutral-300 py-5"
-              >
+              <li key={`${stage.label}-${i}`}>
                 <div
-                  className={`font-heading text-[20px] font-extrabold leading-none ${
-                    stage.status === 'pending' ? 'text-neutral-500' : 'text-accent'
+                  className={`break-inside-avoid rounded-panel bg-panel p-[clamp(18px,2.5vw,26px)] ${
+                    stage.status === 'active'
+                      ? 'shadow-lift ring-2 ring-accent-600'
+                      : 'shadow-panel'
                   }`}
                 >
-                  {String(i + 1).padStart(2, '0')}
-                </div>
-                <div>
-                  <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2">
-                    <h3 className="m-0 font-heading text-[17px] font-bold leading-[1.2] tracking-[-0.02em]">
-                      {stage.label}
-                    </h3>
-                    <StatusPill
-                      tone={
-                        stage.status === 'done'
-                          ? 'done'
-                          : stage.status === 'active'
-                            ? 'active'
-                            : 'waiting'
-                      }
+                  <div className="grid grid-cols-[46px_minmax(0,1fr)] gap-3">
+                    <div
+                      className={`font-heading text-[20px] font-extrabold leading-none ${
+                        stage.status === 'pending' ? 'text-neutral-500' : 'text-accent'
+                      }`}
                     >
-                      {stage.status === 'active' ? (
-                        <Loader
-                          size={11}
-                          strokeWidth={3}
-                          aria-hidden="true"
-                          className="mr-1.5"
-                        />
+                      {String(i + 1).padStart(2, '0')}
+                    </div>
+                    <div>
+                      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2">
+                        <h3 className="m-0 font-heading text-[17.5px] font-bold leading-[1.2] tracking-[-0.025em]">
+                          {stage.label}
+                        </h3>
+                        <StatusPill
+                          tone={
+                            stage.status === 'done'
+                              ? 'done'
+                              : stage.status === 'active'
+                                ? 'active'
+                                : 'waiting'
+                          }
+                        >
+                          {stage.status === 'active' ? (
+                            <Loader
+                              size={11}
+                              strokeWidth={3}
+                              aria-hidden="true"
+                              className="mr-1.5"
+                            />
+                          ) : null}
+                          {STAGE_LABELS[stage.status]}
+                        </StatusPill>
+                      </div>
+                      {stage.detail ? (
+                        <p className="m-0 max-w-[62ch] text-[14.5px] leading-[1.65] text-neutral-800">
+                          {stage.detail}
+                        </p>
                       ) : null}
-                      {STAGE_LABELS[stage.status]}
-                    </StatusPill>
-                  </div>
-                  {stage.detail ? (
-                    <p className="m-0 max-w-[60ch] text-[14.5px] leading-[1.6] text-neutral-800">
-                      {stage.detail}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
-/* ── the payment schedule ───────────────────────────────────────────────── */
-
-export function MilestonesView({
-  milestones,
-  total,
-}: {
-  milestones: Milestone[];
-  total: string;
-}) {
-  const amounts = milestoneAmounts(total, milestones);
-  const paid = milestones.filter((m) => m.status === 'paid');
-  const claimed = totalPercent(milestones);
-
-  return (
-    <section>
-      <SectionHeading>Payment schedule</SectionHeading>
-
-      {milestones.length === 0 ? (
-        <Empty>The payment schedule will appear here once it is agreed.</Empty>
-      ) : (
-        <>
-          <div className="border-t-2 border-text">
-            {milestones.map((milestone, i) => (
-              <div
-                key={`${milestone.label}-${i}`}
-                className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b border-neutral-300 py-5"
-              >
-                <div className="min-w-0 flex-[1_1_320px]">
-                  <div className="mb-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-2">
-                    <span className="font-heading text-[15.5px] font-bold leading-[1.3] tracking-[-0.015em]">
-                      {milestone.label}
-                    </span>
-                    <StatusPill
-                      tone={
-                        milestone.status === 'paid'
-                          ? 'done'
-                          : milestone.status === 'invoiced'
-                            ? 'active'
-                            : 'waiting'
-                      }
-                    >
-                      {MILESTONE_LABELS[milestone.status]}
-                    </StatusPill>
-                  </div>
-                  {milestone.note ? (
-                    <p className="m-0 max-w-[58ch] text-[13.5px] leading-[1.55] text-neutral-700">
-                      {milestone.note}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="text-right">
-                  {amounts[i] ? (
-                    <div className="font-heading text-[17px] font-extrabold leading-none tracking-[-0.02em]">
-                      {amounts[i]}
                     </div>
-                  ) : null}
-                  {/* Same guard as ProposalView: a rupee figure fixed against
-                      a range total has no honest share to print. */}
-                  {milestone.percent > 0 ? (
-                    <div className="mt-1.5 text-[13px] font-semibold uppercase leading-none tracking-[0.08em] text-neutral-700">
-                      {milestone.percent}% of total
-                    </div>
-                  ) : null}
+                  </div>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
-
-          <p className="m-0 mt-5 max-w-[62ch] text-[13.5px] leading-[1.6] text-neutral-700">
-            {paid.length > 0
-              ? `${paid.length} of ${milestones.length} payments received. `
-              : ''}
-            {claimed === 100
-              ? 'Amounts are shares of the project total and exclude GST.'
-              : 'Amounts are shares of the project total and exclude GST. Ask us if the split does not look right.'}{' '}
-            We track payments here and invoice you for each one — nothing is
-            collected on this page.
-          </p>
+          </ol>
         </>
       )}
     </section>

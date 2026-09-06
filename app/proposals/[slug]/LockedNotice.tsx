@@ -1,29 +1,32 @@
 import Link from 'next/link';
-import { Lock } from 'lucide-react';
+import { ArrowRight, Lock } from 'lucide-react';
 
 /**
- * Shown when a gated tab is reached by URL before the proposal is accepted.
- * The tabs are greyed out in the nav, but a typed or bookmarked URL still
- * executes this page — so the page itself says no, not just the chrome.
+ * Shown when a gated stage is reached by URL before the proposal is accepted.
+ * The stages are greyed out in the contents column, but a typed or bookmarked
+ * URL still executes this page — so the page itself says no, not just the
+ * chrome.
  */
 export function LockedNotice({ slug }: { slug: string }) {
   return (
-    <div className="border-2 border-neutral-300 p-7">
-      <div className="mb-3 flex items-center gap-2.5">
-        <Lock size={16} aria-hidden="true" className="text-neutral-700" />
-        <h2 className="m-0 font-heading text-[clamp(19px,2vw,24px)] font-bold leading-[1.15] tracking-[-0.025em]">
-          This opens once the proposal is accepted.
-        </h2>
-      </div>
-      <p className="m-0 mb-5 max-w-[56ch] text-[15px] leading-[1.6] text-neutral-800">
-        Once you accept, this tab shows what we need from you and how the work
-        and payments are going — live, for the whole project.
+    <div className="rounded-panel bg-panel p-[clamp(24px,4vw,44px)] shadow-panel">
+      <span className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-full bg-surface text-neutral-700">
+        <Lock size={18} aria-hidden="true" />
+      </span>
+      <h2 className="m-0 max-w-[20ch] font-heading text-[clamp(22px,2.8vw,32px)] font-extrabold leading-[1.08] tracking-[-0.035em]">
+        This opens once the proposal is accepted.
+      </h2>
+      <p className="m-0 mt-4 max-w-[56ch] text-[15.5px] leading-[1.7] text-neutral-800">
+        Once you accept, the other stages open: what we need from you, where the
+        work has got to, and the payment schedule with your receipts — live, for
+        the whole project.
       </p>
       <Link
         href={`/proposals/${slug}`}
-        className="inline-flex min-h-[44px] items-center border-2 border-text px-5 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
+        className="mt-7 inline-flex min-h-[48px] items-center gap-2.5 rounded-panel-sm bg-text px-5 text-[14.5px] font-semibold leading-none text-bg transition-opacity hover:opacity-90"
       >
         Back to the proposal
+        <ArrowRight size={15} strokeWidth={2.5} aria-hidden="true" />
       </Link>
     </div>
   );

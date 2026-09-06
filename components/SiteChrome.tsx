@@ -9,9 +9,14 @@ import { usePathname } from 'next/navigation';
  * The client portal is chrome-free too — a signed-in client has no use for
  * the marketing nav or the "Request a project scope" lead CTA, and the
  * portal layout carries its own header and sign-out.
+ *
+ * Proposals joined them for the same reason: a client reading the document
+ * they are being asked to sign should not be shown a lead-capture button for
+ * the thing they are already buying. The proposal layout carries its own
+ * document masthead instead.
  */
 const CHROME_FREE_ROUTES = ['/get-quote'];
-const CHROME_FREE_PREFIXES = ['/portal'];
+const CHROME_FREE_PREFIXES = ['/portal', '/proposals'];
 
 export function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

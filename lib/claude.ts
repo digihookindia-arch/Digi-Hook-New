@@ -115,7 +115,13 @@ const PROPOSAL_SCHEMA = {
         },
       },
     },
-    total: { type: 'string', description: 'Total in rupees, e.g. "₹30,000".' },
+    total: {
+      type: 'string',
+      description:
+        'Total in rupees and nothing else, e.g. "₹30,000". Exclusive of GST — ' +
+        'the page adds the tax and shows it separately, so any "+ GST" text ' +
+        'here is printed twice.',
+    },
     terms: {
       type: 'array',
       description:
@@ -221,9 +227,17 @@ itemised pricing table to sum to exactly that figure, in the same style
 than second-guessing the number. If no budget is given, price from the
 house figures above as usual.
 
-All figures above exclude GST. Say so on the proposal: mark the total as
-excluding GST, and include a term stating that GST applies on top at the
-prevailing rate.
+All figures above exclude GST, and every figure you write must too. The page
+adds the tax itself and prints subtotal, GST and total payable as three
+separate lines, so:
+- Write the total as a plain rupee figure and nothing else: "₹30,000", never
+  "₹30,000 + 18% GST" and never "₹30,000 inclusive of GST". Anything appended
+  there is printed twice.
+- Never state a GST amount or a GST-inclusive figure in the pricing lines, the
+  terms, or any section body. You do not know the rate this proposal bills at;
+  the page does.
+- Never state a payment split anywhere. The schedule is rendered from the
+  studio's own milestones.
 
 House technology stack — name these and nothing else. Every line is taken from
 what the studio already publishes on its Technology page:

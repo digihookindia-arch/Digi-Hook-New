@@ -19,7 +19,7 @@ Where the durable knowledge lives, in the order worth reading:
 |---|---|
 | **This file** | Conventions, architecture, and the gotchas that cost real time. Authoritative — if code and this file disagree, one of them is a bug. |
 | `memory/digihook-*.md` (in the Claude project memory) | Why decisions were made, what the client actually asked for, and what is still undecided. `digihook-open-decisions.md` is the pre-launch checklist. `digihook-proposal-roadmap.md` is the built-vs-not list. |
-| `lib/enquiry.test.ts`, `lib/delivery.test.ts` | Behaviour that must not regress. 82 cases. They deliberately fail when the schema changes — that is the point. |
+| `lib/enquiry.test.ts`, `lib/delivery.test.ts`, `lib/money.test.ts` | Behaviour that must not regress. They deliberately fail when the schema changes — that is the point. `money.test.ts` pins the GST arithmetic that reaches a client's invoice. |
 | `assets-source/README.md` | The originals the build derives from, and how to regenerate. |
 | `design_handoff_digihook_website/` | The original design prototype. Still the spec for any page markup. |
 
@@ -61,13 +61,25 @@ design system). Read the relevant block there before changing a page's markup.
 - **No hard-coded colour values.** Tokens are CSS variables in `app/globals.css :root`;
   `tailwind.config.ts` maps names onto `var(--…)`. Use `bg-bg`, `text-accent-700`,
   `border-neutral-300`, etc. Arbitrary values are for **sizes only** (`text-[15.5px]`).
-  One deliberate exception: `lib/og.tsx` — Satori cannot resolve CSS custom properties,
-  so it repeats the palette in one commented block that must be kept in sync.
+  Two deliberate exceptions, both because a third party renders the pixels and
+  cannot read our custom properties: `lib/og.tsx` (Satori) repeats the palette in one
+  commented block, and `app/proposals/[slug]/payment/PayButton.tsx` passes
+  `--color-accent-600` to the Razorpay checkout as a literal hex. Keep both in sync
+  with `globals.css`.
 - **No media queries, no `sm:`/`md:`/`lg:` prefixes.** Every responsive grid is
   `grid-cols-[repeat(auto-fit,minmax(min(100%,Npx),1fr))]`. Asymmetric layouts use
   `flex-wrap` + `flex-[1_1_Npx]`. Where behaviour must change with width, express it
   fluidly — `clamp()`, `flex-wrap`, `self-stretch` — never a breakpoint.
-- **Border radius is 0 everywhere**, on purpose. Never add `rounded-*`.
+- **Border radius is 0 everywhere on the marketing site**, on purpose. Never add
+  `rounded-*` there — every named step in `tailwind.config.ts` resolves to 0, so
+  a stray `rounded-lg` is a no-op rather than a slow drift.
+  **The signed-in client surfaces are the one exception** (client's call,
+  2026-09-06): `/proposals` and `/portal` may use `rounded-panel`,
+  `rounded-panel-sm`, `bg-panel`, `shadow-panel` and `shadow-lift`. Those five
+  tokens exist for those two areas and nowhere else. The job there is different
+  — somebody is reading a contract, agreeing to it and paying for it, and depth
+  is what separates "a thing I can act on" from a wall of text. The public site
+  stays strictly flat, because that is the brand.
 - **Contrast (measured, not guessed).** On the light ground: `accent` 3.76:1 and
   `neutral-600` 3.85:1 both **fail** AA for normal text; `accent-700` 6.41:1 and
   `neutral-700` 5.83:1 pass. White on `accent` is 4.20:1 and **fails**; white on
@@ -110,7 +122,7 @@ design system). Read the relevant block there before changing a page's markup.
 | `app/` | 16 public routes + `sitemap.ts` / `robots.ts` / `opengraph-image.tsx` per segment; `dashboard/`, `proposals/`, `portal/` |
 | `content/` | All copy as typed modules. Edit copy here, never in JSX. |
 | `components/` | Shared chrome + `ServicePage` / `DeepPage` / `PageHero` / `Accordion` / `CtaBand` / `ArticleLayout` |
-| `lib/` | `site.ts` (company facts), `seo.ts`, `jsonld.tsx`, `og.tsx`, `enquiry.ts`, `enquiries.ts`, `proposals.ts`, `db.ts`, `email.ts`, `auth.ts`, `claude.ts`, `clients.ts`, `portalProjects.ts`, `support.ts`, `tickets.ts` / `ticketRules.ts`, `portalEmails.ts`, `seoAudit.ts` / `seoAudits.ts`, `searchConsole.ts`, `seoWork.ts` / `seoRecords.ts`, `pageSpeed.ts`, `dataForSeo.ts` |
+| `lib/` | `site.ts` (company facts), `seo.ts`, `jsonld.tsx`, `og.tsx`, `enquiry.ts`, `enquiries.ts`, `proposals.ts`, `proposalDoc.ts`, `db.ts`, `email.ts`, `auth.ts`, `claude.ts`, `money.ts`, `payments.ts` / `razorpay.ts` / `paymentFlow.ts` / `paymentEmails.ts`, `clients.ts`, `portalProjects.ts`, `support.ts`, `tickets.ts` / `ticketRules.ts`, `portalEmails.ts`, `seoAudit.ts` / `seoAudits.ts`, `searchConsole.ts`, `seoWork.ts` / `seoRecords.ts`, `pageSpeed.ts`, `dataForSeo.ts` |
 | `scripts/` | `seo-check.mjs` — the crawler behind `npm run seo` |
 
 Shared page layouts exist — check `components/` before hand-rolling new page markup.
@@ -155,14 +167,32 @@ caught and logged, never surfaced, because losing the lead is worse than a missi
 acknowledgement.
 
 ### Email
-`lib/email.ts` sends via the studio's own Hostinger mailbox over SMTP (nodemailer),
-not a third-party API. digihook.in's DNS already carries Hostinger's DKIM/SPF/DMARC
-records for this mailbox, so sending through it rides on authentication that's
-already verified — deliberately avoids standing up a second provider with its own
-separate domain verification. With no `SMTP_USER`/`SMTP_PASS` it logs instead of
-sending and `isEmailConfigured()` returns false so the dashboard says so plainly —
-**it never pretends to have sent anything**. The one address is `sales@digihook.in`
+`lib/email.ts` sends via the studio's own **Zoho** mailbox over SMTP (nodemailer),
+not a third-party API — riding on the mailbox that already owns the domain's mail
+rather than standing up a second provider with its own domain verification.
+
+**Zoho India, not Zoho global — `smtp.zoho.in`.** Verified from DNS 2026-09-07:
+MX is `mx.zoho.in`, SPF is `v=spf1 include:zoho.in ~all`, and the DKIM selector
+is `zmail._domainkey`. Zoho's data centres do not share credentials, so
+`smtp.zoho.com` returns 535 for this account.
+
+**This file previously said Hostinger, and `lib/email.ts` defaulted to
+`smtp.hostinger.com`. Both were wrong** (corrected 2026-09-07). It failed twice
+over: the login was rejected, and had it succeeded, SPF authorises only Zoho, so
+the mail would have failed authentication at the recipient and landed in spam.
+There is no `hostingermail-a._domainkey` record. If email ever silently stops,
+check the MX and SPF records before the credentials.
+
+**There is no DMARC record for digihook.in** (`_dmarc` does not resolve).
+SPF and DKIM alone still authenticate, but nothing tells receivers what to do
+with a failure and no reports come back. Worth adding `p=none` at minimum.
+
+With no `SMTP_USER`/`SMTP_PASS` it logs instead of sending and
+`isEmailConfigured()` returns false so the dashboard says so plainly — **it never
+pretends to have sent anything**. The one address is `contact@digihook.in`
 (sender, SMTP login, notification inbox, and the published `site.email`).
+Note that Zoho requires an **app-specific password** when two-factor
+authentication is on; the account password will not authenticate over SMTP.
 
 ### Proposal dashboard (`/dashboard`)
 Shared team password → HMAC session cookie. `middleware.ts` only checks a cookie
@@ -174,12 +204,39 @@ search three ways: `noindex`, `robots.ts` disallow, and absence from the sitemap
 `/dashboard/enquiries` lists submitted briefs; "Draft proposal" opens `/dashboard/new`
 prefilled from the enquiry and links the two on save.
 
-### Client-facing proposal tabs
-`/proposals/<slug>` has three tabs — the proposal, `/assets` ("what we need from you")
-and `/status` (work stages + payment schedule). The access-code gate lives in
-`app/proposals/[slug]/layout.tsx` and covers all three.
+### Client-facing proposal stages
+`/proposals/<slug>` has four numbered stages — 01 the proposal, 02 `/assets`
+("what we need from you"), 03 `/status` (work stages) and 04 `/payment`
+(the schedule, GST and online payment). The access-code gate lives in
+`app/proposals/[slug]/layout.tsx` and covers all four.
 
-**Acceptance gates the second and third tabs.** The flow is proposal → accept →
+**Navigation is a contents column down the left**, not a row of tabs
+(`ProposalNav.tsx`, client's direction 2026-09-06) — numbered like the
+document's own sections, each with a line saying what is behind it, which is
+what a column has room for and a tab row does not. The layout is
+`flex-wrap` with a 200px-basis nav and a `flex-[999_1_540px]` document: the
+999 makes the document swallow all free space side by side, and when the two no
+longer fit the nav wraps onto its own row where its `flex-grow: 1` spreads it
+full width. **No breakpoint, and none is needed.** `sticky` sits on the `<nav>`
+inside the flex item, never on the item — a stretched flex item is the
+containing block, so `sticky` on the item resolves against a box exactly as
+tall as the nav and scrolls away instantly. Same trap as the grid `<aside>`
+below.
+
+**`/proposals` is chrome-free** — it is in `SiteChrome`'s excluded prefixes
+alongside `/portal`, so the marketing header and footer do not render. A client
+reading the document they are being asked to sign should not be shown a
+"Request a project scope" button for the thing they are already buying. The
+layout carries its own letterhead (logo, reference, print-to-PDF) instead.
+
+**The header block states the document's identity**: prepared for / prepared by /
+issued / price-held-until, a status badge (awaiting / accepted / price needs
+confirming), and a confidentiality line in the footer. Validity is 30 days
+(`PROPOSAL_VALID_DAYS` in `lib/proposalDoc.ts`) and is **presentational only** —
+nothing refuses a late acceptance, it just stops a client assuming a six-month-old
+price still holds. `site.gstin` renders only when set; never invent one.
+
+**Acceptance gates tabs two, three and four.** The flow is proposal → accept →
 the rest unlocks. `accepted_at` is set by the client's Accept button (guarded by
 the access cookie) or by the studio from the dashboard ("agreed on a call"); the
 client's button is one-way — only the dashboard can un-accept. The greyed tabs
@@ -203,13 +260,122 @@ Section numbers are 15px, so they use `accent-700`; the timeline's own 20px bold
 numerals are large text and may stay bare `accent`.
 
 **The payment schedule renders from `proposal.milestones`, not from `content`.**
-One source of truth with the `/status` tab — the schedule the client agrees to
+One source of truth with the `/payment` tab — the schedule the client agrees to
 and the schedule the studio bills against cannot drift. It is deliberately in
-the proposal *above* the acceptance block: `/status` is locked until after
+the proposal *above* the acceptance block: `/payment` is locked until after
 acceptance, so without this the client would be agreeing to a payment plan they
 could not see. Claude is instructed never to state a payment split anywhere in
 `content` (a generated draft once put "50% upfront" in `terms` while the
 milestones said 20/30/50).
+
+**`/status` shows work only.** The schedule moved to `/payment` when online
+payment arrived — two renderings of the same money on adjacent tabs is how a
+client ends up reading a stale one. `components/DeliveryView.tsx` therefore has
+no money in it at all; `components/PaymentView.tsx` owns that.
+
+### GST and payment
+
+**Every figure Claude writes is exclusive of GST, and the page adds the tax.**
+`lib/money.ts` is the pure half (rate clamping, `gstOn`, `gstShares`, rupee
+formatting, paise) and `milestoneSchedule` / `scheduleTotals` in
+`lib/delivery.ts` turn a proposal total plus milestones into per-row
+quoted / tax / payable figures. **Everything a client is asked to pay comes
+through `milestoneSchedule`** — the proposal document, the payment tab, the
+studio's editor and the receipt emails all read it, so they cannot describe the
+same money four different ways. Per-row tax is rounded to whole rupees with the
+last row absorbing the drift, because a client adds the column up.
+
+The rate lives on the proposal row (`gst_percent`, default 18), not in a
+constant: the rate that applied when a client signed is a fact about that
+proposal. Edit it beside the payment schedule in the dashboard. A total that is
+a range or prose still yields **no rupee figure at all** rather than a
+confidently wrong one — `parseAmount`'s rule, extended through the tax.
+
+**Razorpay** (`lib/razorpay.ts`, no SDK — three REST calls and two HMACs) is
+dormant until `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are set, the SMTP
+pattern: the Payment tab then says plainly that we will invoice instead, and
+**never renders a dead button or invents bank details**. The rules that matter:
+
+- **The browser never names a price.** It asks to open a payment for a milestone
+  *position*; the server derives the amount from the stored proposal.
+- **Nothing is called paid on a callback alone.** `settlePayment`
+  (`lib/paymentFlow.ts`) verifies the checkout signature, then asks Razorpay
+  what was actually captured and refuses a mismatched order or amount.
+- **It is idempotent**, because the browser callback and the webhook routinely
+  both fire. The transition lives in `markPaymentPaid`, whose UPDATE is
+  conditional on the row still being `created`; only the write that moves it
+  marks the milestone and sends the receipt.
+- **The ledger keeps its failures.** A row is written *before* the client
+  reaches the checkout, so an abandoned attempt is visible rather than a gap.
+  The client sees settled rows only; the dashboard sees all of them.
+- `/api/razorpay/webhook` plays dead (404) without `RAZORPAY_WEBHOOK_SECRET`,
+  the cron-route guard. It signs over the **raw** body — re-serialising parsed
+  JSON changes the digest — and returns 200 for anything it does not act on, or
+  Razorpay retries for days.
+- **Receipts vs tax invoices**: a payment that clears with the billing details
+  on file gets a real GST tax invoice; one that clears without them gets a
+  plain receipt that says so. See below.
+
+### Due dates and the running total due
+
+**A payment past its due date stops being an individual transaction.** Client's
+direction, 2026-09-06: milestones carry a `dueDate` (a plain ISO date, no
+time), and once that date arrives the row joins a running **total due** at the
+top of the payment stage. Its own Pay button greys out with the reason, and the
+client settles everything overdue in one payment — chasing three late payments
+one checkout at a time is how a client pays none of them. Rows not yet due keep
+their own button, so paying early is still possible.
+
+`milestoneSchedule` returns a `dueState` per row (`paid` / `due` / `upcoming` /
+`undated`) and `totalDue` sums the `due` ones. **A null `dueDate` is not
+"never"** — it means the row falls due on an event rather than a date, and such
+a row never becomes overdue and never joins the total. Dates compare as
+strings, which is exact on ISO dates and sidesteps time zones entirely; that is
+the whole reason the date is stored without a time.
+
+**One payment can settle several milestones** (`payments.milestone_indexes`,
+a JSON array; `milestone_index` keeps the first for the older index-based
+lookups). `paidMilestones` unions the arrays, and `settlePayment` marks every
+index it covers. Rows written before that column read back as their single
+index.
+
+### GST tax invoices
+
+**Issued automatically the moment a payment clears**, numbered, stored,
+rendered to PDF and emailed as an attachment. `lib/gst.ts` is the pure half
+(state codes, GSTIN shape, the CGST/SGST-vs-IGST split, amount in words,
+financial-year numbering) and is pinned by `lib/gst.test.ts`; `lib/invoices.ts`
+is numbering and storage; `lib/invoicePdf.ts` renders it.
+
+- **Intra-state is CGST + SGST at half the rate each; inter-state is IGST at
+  the full rate.** Decided by comparing the place of supply against
+  `site.gstStateCode`, never by anything a client typed. The two halves are
+  reconciled so they sum to the whole tax exactly.
+- **Everything the invoice states is frozen at issue time** — supplier GSTIN,
+  client name, address, GSTIN, place of supply, the split. A tax invoice is a
+  record of what was stated on a date; re-deriving it from today's proposal row
+  would rewrite history the first time somebody fixes a typo.
+- **Numbers are consecutive within the financial year** (`DH/26-27/0007`, Rule
+  46). Allocated as `MAX(sequence) + 1` inside a `BEGIN IMMEDIATE` transaction,
+  with a UNIQUE index on `number` as the backstop.
+- **Idempotent**, keyed on the payment: the browser callback and the webhook
+  both reach it, and a client must never get two numbers for one payment.
+- **It refuses rather than guesses.** Without `site.gstin`, the client's state
+  or their billing address, `issueInvoice` returns the missing fields; the
+  client gets a plain receipt that says it is a receipt, and the studio's alert
+  names the field. The dashboard's billing panel shows the same list before a
+  payment ever clears, and an "Issue invoice" button raises it retrospectively.
+- `lib/pdf.ts` is a **hand-rolled minimal PDF writer** — no dependency, same
+  judgement as the SDK-free Razorpay client. Base-14 Helvetica only, so nothing
+  is embedded; the price is WinAnsi encoding, which **has no rupee glyph**.
+  Money is therefore printed as plain grouped digits with the currency in the
+  column head ("Amount (INR)"), which is standard on Indian invoices anyway.
+  `textRight` only measures numeric strings (every Helvetica digit is 556/1000)
+  and **throws on anything else**, so a misaligned column is a crash at build
+  time rather than a wrong-looking invoice.
+- **Receipts are not tax invoices and the copy never blurs the two.** The
+  studio still raises nothing by hand except where blocked.
+
 
 **`content.technology` names the stack** (Next.js / Node.js / MongoDB / TypeScript /
 Tailwind / edge hosting) with a per-project "what it means for you" line. The
@@ -522,7 +688,8 @@ pixels away**, so the rules here are not stylistic:
   its own row — a sticky `<aside>` keeps floating over the content once the grid collapses
   to one column. Put `sticky` on an inner wrapper and let the item `self-stretch`.
 - **Backticks inside a template literal** terminate it — do not use them in the SQL
-  comments in `lib/db.ts`.
+  comments in `lib/db.ts`, and do not use them to quote a field name in the
+  `SYSTEM` prompt in `lib/claude.ts`, which is one long template literal too.
 
 ## Verifying UI changes
 

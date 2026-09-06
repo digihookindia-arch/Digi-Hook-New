@@ -6,6 +6,9 @@ import {
   milestoneAmounts,
   totalPercent,
   seedStages,
+  cleanDueDate,
+  milestoneSchedule,
+  totalDue,
   type Milestone,
 } from '@/lib/delivery';
 
@@ -37,6 +40,7 @@ const split = (percents: number[]): Milestone[] =>
     status: 'pending',
     note: '',
     amount: null,
+    dueDate: null,
   }));
 
 /** A split with an exact rupee figure fixed on one row. */
@@ -136,6 +140,80 @@ check('the phase name and deliverable carry over',
   stages[0]?.label === 'Discovery' && stages[0]?.detail === 'Sitemap agreed.');
 check('every seeded stage starts as not started',
   stages.every((s) => s.status === 'pending'));
+
+console.log('\n— due dates and the running total due —');
+
+const dated = (dueDates: (string | null)[]): Milestone[] =>
+  dueDates.map((dueDate, i) => ({
+    label: `payment ${i + 1}`,
+    percent: [20, 30, 50][i] ?? 0,
+    status: 'pending' as const,
+    note: '',
+    amount: null,
+    dueDate,
+  }));
+
+const TODAY = '2026-09-06';
+const sched = (dueDates: (string | null)[], settled: number[] = []) =>
+  milestoneSchedule('₹30,000', dated(dueDates), 18, new Set(settled), TODAY);
+
+check('a date in the past is due now',
+  sched(['2026-08-16', null, null])[0]?.dueState === 'due');
+check('today counts as due',
+  sched([TODAY, null, null])[0]?.dueState === 'due');
+check('a date in the future is upcoming',
+  sched(['2026-12-01', null, null])[0]?.dueState === 'upcoming');
+check('no date is never due',
+  sched([null, null, null])[0]?.dueState === 'undated');
+check('a settled position is paid whatever its date says',
+  sched(['2026-08-16', null, null], [0])[0]?.dueState === 'paid');
+
+{
+  // 20/30/50 of ₹30,000 -> 6,000 / 9,000 / 15,000 ex GST.
+  const rows = sched(['2026-08-16', '2026-09-02', '2026-12-01']);
+  const due = totalDue(rows);
+  check('the total due accumulates every overdue payment',
+    due?.rows.length === 2, due?.rows.map((r) => r.index));
+  check('and adds up to their payable sum, GST included',
+    due?.payable === 17700, due?.payable);
+  check('its two halves are the quoted sum and the tax',
+    due?.subtotal === 15000 && due?.gst === 2700, due);
+  check('an upcoming payment stays out of it',
+    rows[2]?.dueState === 'upcoming');
+}
+
+check('nothing overdue means no total due',
+  totalDue(sched(['2026-12-01', null, null])) === null);
+check('a paid overdue payment drops out of the total',
+  totalDue(sched(['2026-08-16', '2026-09-02', null], [0]))?.payable === 10620,
+  totalDue(sched(['2026-08-16', '2026-09-02', null], [0]))?.payable);
+
+{
+  // A range total prices nothing, so there is no honest total to show.
+  const unpriceable = milestoneSchedule(
+    '₹20,000 – ₹30,000', dated(['2026-08-16', null, null]), 18, new Set(), TODAY);
+  check('an unpriceable overdue row yields no total due',
+    totalDue(unpriceable) === null);
+}
+
+console.log('\n— due dates survive the parser —');
+
+check('a plain ISO date is kept',
+  cleanDueDate('2026-09-20') === '2026-09-20');
+check('a timestamp is trimmed to its date',
+  cleanDueDate('2026-09-20T11:30:00.000Z') === '2026-09-20');
+check('a day that does not exist is refused',
+  cleanDueDate('2026-02-31') === null);
+check('a half-typed date is refused', cleanDueDate('2026-09') === null);
+check('junk is refused', cleanDueDate('soon') === null);
+check('a non-string is refused', cleanDueDate(20260920) === null);
+check('a posted due date round-trips through parseMilestones',
+  parseMilestones([{ label: 'X', percent: 0, status: 'pending', note: '', dueDate: '2026-09-20' }])[0]?.dueDate === '2026-09-20');
+check('a crafted due date cannot reach the client page',
+  parseMilestones([{ label: 'X', percent: 0, status: 'pending', note: '', dueDate: '<script>' }])[0]?.dueDate === null);
+check('rows stored before the column read back undated',
+  parseMilestones([{ label: 'X', percent: 0, status: 'pending', note: '' }])[0]?.dueDate === null);
+
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) process.exit(1);

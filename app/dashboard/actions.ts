@@ -20,6 +20,8 @@ import {
   saveProposal,
   setAssetsShared,
   setProposalAccepted,
+  setProposalBilling,
+  setProposalGst,
   type Proposal,
 } from '@/lib/proposals';
 import {
@@ -28,6 +30,17 @@ import {
   parseStages,
   seedDelivery,
 } from '@/lib/delivery';
+import { sendEmail } from '@/lib/email';
+import { INVOICE_BLOCK_LABELS } from '@/lib/gst';
+import {
+  invoiceFilename,
+  issueInvoice,
+  markInvoiceEmailed,
+} from '@/lib/invoices';
+import { renderInvoicePdf } from '@/lib/invoicePdf';
+import { DEFAULT_GST_PERCENT, cleanGstPercent } from '@/lib/money';
+import { invoiceIssuedEmail } from '@/lib/paymentEmails';
+import { listPayments } from '@/lib/payments';
 import { parseProposalContent } from '@/lib/proposalContent';
 import { draftProposal, reviseProposal } from '@/lib/claude';
 
@@ -132,6 +145,14 @@ export async function createProposal(
     // address before it will send anything.
     clientEmail: source?.email ?? '',
     clientPhone: source?.phone ?? '',
+    // The prevailing rate. Editable per proposal beside the payment
+    // schedule, for the rare project billed at something else.
+    gstPercent: DEFAULT_GST_PERCENT,
+    // Billing identity is filled in by the studio before the first invoice.
+    // Empty is honest: nothing here can be inferred from an enquiry.
+    clientAddress: '',
+    clientGstin: '',
+    clientState: null,
     createdAt: now,
     updatedAt: now,
     // Accepted later — by the client on the page, or the studio after a call.
@@ -286,13 +307,18 @@ export async function saveDeliveryAction(
       milestones: parseMilestones(toRows(payload.milestones)),
       stages: parseStages(toRows(payload.stages)),
     });
+    // Its own write, to its own column. `saveDelivery` deliberately touches
+    // only the three lists, and the tax rate is not one of them.
+    await setProposalGst(slug, cleanGstPercent(formData.get('gstPercent')));
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Could not save.' };
   }
 
   revalidatePath(`/dashboard/${slug}`);
+  revalidatePath(`/proposals/${slug}`);
   revalidatePath(`/proposals/${slug}/assets`);
   revalidatePath(`/proposals/${slug}/status`);
+  revalidatePath(`/proposals/${slug}/payment`);
   return { savedAt: new Date().toISOString() };
 }
 
@@ -337,4 +363,95 @@ export async function removeProposal(formData: FormData): Promise<void> {
   if (slug) await deleteProposal(slug);
   revalidatePath('/dashboard');
   redirect('/dashboard');
+}
+
+/**
+ * The client's billing identity — address, GSTIN and state.
+ *
+ * The state is the one that matters: it is the place of supply, and it decides
+ * CGST/SGST versus IGST on every invoice for this project. Without it the
+ * system will not issue a tax invoice at all, so this form is the thing that
+ * has to be filled in before the first payment clears.
+ */
+export async function updateBillingAction(formData: FormData): Promise<void> {
+  await requireSession();
+
+  const slug = String(formData.get('slug') ?? '');
+  if (!slug) return;
+
+  await setProposalBilling(slug, {
+    address: String(formData.get('billingAddress') ?? ''),
+    gstin: String(formData.get('clientGstin') ?? ''),
+    state: String(formData.get('clientState') ?? ''),
+  });
+
+  revalidatePath(`/dashboard/${slug}`);
+}
+
+export type IssueInvoiceState = { error?: string; issued?: string };
+
+/**
+ * Issues a tax invoice for a payment that settled before the billing details
+ * were on file — the retrospective half of the flow in `lib/paymentFlow.ts`.
+ *
+ * Emails it too, so the studio does not have to. `issueInvoice` is keyed on the
+ * payment, so pressing this twice returns the same invoice rather than
+ * allocating a second number for one payment.
+ */
+export async function issueInvoiceAction(
+  _prev: IssueInvoiceState,
+  formData: FormData
+): Promise<IssueInvoiceState> {
+  await requireSession();
+
+  const slug = String(formData.get('slug') ?? '');
+  const paymentId = String(formData.get('paymentId') ?? '');
+
+  const proposal = await getProposal(slug);
+  if (!proposal) return { error: 'That proposal no longer exists.' };
+
+  const payment = (await listPayments(slug)).find((p) => p.id === paymentId);
+  if (!payment) return { error: 'That payment is not on this proposal.' };
+  if (payment.status !== 'paid') {
+    return { error: 'That payment has not settled, so there is nothing to invoice.' };
+  }
+
+  const issued = await issueInvoice(proposal, payment);
+  if (!issued.ok) {
+    return {
+      error: issued.blocks.map((block) => INVOICE_BLOCK_LABELS[block]).join(' '),
+    };
+  }
+
+  const { invoice } = issued;
+  if (proposal.clientEmail && !invoice.emailedAt) {
+    // Best-effort, like every other send in this codebase: the invoice exists
+    // and is downloadable either way, and a mail failure must not leave the
+    // studio thinking no invoice was raised.
+    try {
+      await sendEmail({
+        to: proposal.clientEmail,
+        ...invoiceIssuedEmail({
+          name: proposal.client,
+          slug: proposal.slug,
+          payment,
+          invoiceNumber: invoice.number,
+        }),
+        attachments: [
+          {
+            filename: invoiceFilename(invoice),
+            content: renderInvoicePdf({ invoice, payment }),
+            contentType: 'application/pdf',
+          },
+        ],
+      });
+      await markInvoiceEmailed(invoice.id);
+    } catch (e) {
+      console.error('[invoices] email failed', invoice.number, e);
+    }
+  }
+
+  revalidatePath(`/dashboard/${slug}`);
+  revalidatePath(`/proposals/${slug}/payment`);
+  return { issued: invoice.number };
 }

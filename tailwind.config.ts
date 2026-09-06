@@ -21,6 +21,8 @@ const config: Config = {
       colors: {
         bg: 'var(--color-bg)',
         surface: 'var(--color-surface)',
+        // A raised white sheet. Client surfaces only - see globals.css.
+        panel: 'var(--color-panel)',
         text: 'var(--color-text)',
         divider: 'var(--color-divider)',
         accent: {
@@ -77,6 +79,9 @@ const config: Config = {
         sm: 'var(--shadow-sm)',
         md: 'var(--shadow-md)',
         lg: 'var(--shadow-lg)',
+        // Client surfaces only (/proposals, /portal) - see globals.css.
+        panel: 'var(--shadow-panel)',
+        lift: 'var(--shadow-lift)',
       },
       keyframes: {
         'dh-marquee': {
@@ -115,8 +120,11 @@ const config: Config = {
         'dh-tilt': 'dh-tilt 11s cubic-bezier(0.45,0,0.55,1) infinite',
       },
     },
-    // Radius is 0 everywhere on purpose (Modernist). `full` stays available for
-    // the genuinely circular controls (e.g. the radio dot) that opt in explicitly.
+    // Radius is 0 everywhere on purpose (Modernist). Every named step below
+    // resolves to 0, so `rounded-lg` on a marketing page is a no-op rather than
+    // a slow drift. `full` stays available for the genuinely circular controls
+    // (e.g. the radio dot) that opt in explicitly, and `panel` / `panel-sm` are
+    // the client-surface opt-in - /proposals and /portal only, see globals.css.
     borderRadius: {
       none: '0',
       sm: '0',
@@ -127,6 +135,8 @@ const config: Config = {
       '2xl': '0',
       '3xl': '0',
       full: '9999px',
+      panel: 'var(--radius-panel)',
+      'panel-sm': 'var(--radius-panel-sm)',
     },
   },
   plugins: [],

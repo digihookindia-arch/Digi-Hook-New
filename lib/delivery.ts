@@ -1,3 +1,4 @@
+import { formatInr, gstShares } from './money';
 import type { ProposalContent, ProposalPhase } from './proposals';
 
 /**
@@ -33,6 +34,19 @@ export type Milestone = {
    * total is a range and percentages alone cannot produce a figure.
    */
   amount: number | null;
+  /**
+   * The date this payment falls due, as a plain ISO date ("2026-09-20"), or
+   * null while the studio has not set one.
+   *
+   * A date, not a timestamp: a payment is due on a day, and comparing
+   * timestamps would make a milestone fall due at midnight UTC, which is
+   * half past five in the morning here.
+   *
+   * Null is not "never" — it means the schedule is dated by event rather than
+   * by calendar ("due on sign-off"), which is how most of these start. A row
+   * with no date never becomes overdue, and never joins the total due.
+   */
+  dueDate: string | null;
 };
 export type WorkStage = { label: string; detail: string; status: StageStatus };
 
@@ -65,9 +79,9 @@ export const STAGE_LABELS: Record<StageStatus, string> = {
  * per project from the dashboard — this is only where a new proposal starts.
  */
 export const DEFAULT_MILESTONES: Milestone[] = [
-  { label: 'Advance', percent: 20, status: 'pending', note: 'Due on sign-off, before work starts.', amount: null },
-  { label: 'Frontend complete', percent: 30, status: 'pending', note: 'Due when the build is ready for your review.', amount: null },
-  { label: 'On completion', percent: 50, status: 'pending', note: 'Due on handover, before the site goes live.', amount: null },
+  { label: 'Advance', percent: 20, status: 'pending', note: 'Due on sign-off, before work starts.', amount: null, dueDate: null },
+  { label: 'Frontend complete', percent: 30, status: 'pending', note: 'Due when the build is ready for your review.', amount: null, dueDate: null },
+  { label: 'On completion', percent: 50, status: 'pending', note: 'Due on handover, before the site goes live.', amount: null, dueDate: null },
 ];
 
 /**
@@ -102,11 +116,12 @@ export function seedDelivery(content: ProposalContent): Delivery {
 
 /* ── money ──────────────────────────────────────────────────────────────── */
 
-export function formatInr(amount: number): string {
-  return `₹${Math.round(amount).toLocaleString('en-IN', {
-    maximumFractionDigits: 0,
-  })}`;
-}
+/*
+ * Rupee formatting lives in `lib/money.ts` alongside the GST arithmetic, so
+ * there is one place that decides how money is written. Re-exported here
+ * because every caller of the schedule already imports it from this module.
+ */
+export { formatInr };
 
 /**
  * Pull a number out of the proposal total so milestone amounts can be derived
@@ -164,6 +179,29 @@ export function milestoneAmounts(
   return milestoneAmountValues(total, milestones).map((n) =>
     n === null ? null : formatInr(n)
   );
+}
+
+/**
+ * A plain ISO date ("2026-09-20") or null. Anything else — a timestamp, a
+ * half-typed date, junk from a crafted payload — reads as null, because a
+ * milestone with an unparseable date must simply not be dated rather than
+ * become permanently overdue.
+ */
+export function cleanDueDate(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const date = value.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  // Rejects 2026-02-31 and friends: Date normalises them, so round-tripping is
+  // the cheap way to find out whether the day actually exists.
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return parsed.toISOString().slice(0, 10) === date ? date : null;
+}
+
+/** Today, as the same plain ISO date the milestones carry. */
+export function todayIso(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate()
+  ).padStart(2, '0')}`;
 }
 
 export function totalPercent(milestones: Milestone[]): number {
@@ -243,6 +281,7 @@ export function parseMilestones(input: string | unknown[]): Milestone[] {
           amount !== null && Number.isFinite(amount) && amount >= 0
             ? Math.round(amount)
             : null,
+        dueDate: cleanDueDate(row.dueDate),
       };
     })
     .filter((m) => m.label.length > 0);
@@ -268,4 +307,154 @@ export function hasDelivery(delivery: Delivery): boolean {
     delivery.milestones.length > 0 ||
     delivery.stages.length > 0
   );
+}
+
+/* ── the schedule, with tax ─────────────────────────────────────────────── */
+
+/**
+ * One payment as every client-facing surface needs it: the quoted share, the
+ * tax on it, and what is actually payable — with the display strings already
+ * formatted.
+ *
+ * `subtotal` is null when the proposal total is a range or prose and the row
+ * carries no explicit amount, in which case so are `gst` and `payable`. A row
+ * that cannot be priced honestly shows a percentage and nothing else.
+ */
+/**
+ * Where a payment stands against the calendar.
+ *
+ *  - `paid`     — settled, by gateway or by hand.
+ *  - `due`      — dated, that date has arrived or passed, still unpaid. These
+ *                 are the rows that make up the total due, and the client pays
+ *                 them together rather than one at a time.
+ *  - `upcoming` — dated in the future. Payable early if the client wants to.
+ *  - `undated`  — no calendar date; it falls due on an event instead.
+ */
+export type DueState = 'paid' | 'due' | 'upcoming' | 'undated';
+
+export type ScheduleRow = {
+  milestone: Milestone;
+  index: number;
+  dueState: DueState;
+  subtotal: number | null;
+  gst: number | null;
+  payable: number | null;
+  subtotalText: string | null;
+  gstText: string | null;
+  payableText: string | null;
+};
+
+/**
+ * The payment schedule with GST applied, derived in one place so the proposal
+ * document, the status tab, the payment tab and the receipt emails cannot
+ * describe the same money four different ways. Everything a client is asked to
+ * pay comes through here.
+ */
+export function milestoneSchedule(
+  total: string,
+  milestones: Milestone[],
+  gstPercent: number,
+  /**
+   * Which positions have settled — the gateway ledger's view, which the
+   * milestone's own `status` does not know about. Passed in rather than read,
+   * so this module stays free of storage.
+   */
+  settled: ReadonlySet<number> = new Set(),
+  today: string = todayIso()
+): ScheduleRow[] {
+  const subtotals = milestoneAmountValues(total, milestones);
+  const taxes = gstShares(subtotals, gstPercent);
+
+  return milestones.map((milestone, index) => {
+    const subtotal = subtotals[index] ?? null;
+    const gst = taxes[index] ?? null;
+    const payable = subtotal === null || gst === null ? null : subtotal + gst;
+    const paid = milestone.status === 'paid' || settled.has(index);
+    // String comparison is correct on ISO dates and sidesteps time zones
+    // entirely — the whole reason the date is stored without a time.
+    const dueState: DueState = paid
+      ? 'paid'
+      : milestone.dueDate === null
+        ? 'undated'
+        : milestone.dueDate <= today
+          ? 'due'
+          : 'upcoming';
+    return {
+      milestone,
+      index,
+      dueState,
+      subtotal,
+      gst,
+      payable,
+      subtotalText: subtotal === null ? null : formatInr(subtotal),
+      gstText: gst === null ? null : formatInr(gst),
+      payableText: payable === null ? null : formatInr(payable),
+    };
+  });
+}
+
+/**
+ * What the schedule adds up to. Null wherever a row could not be priced —
+ * a partial sum presented as a total is exactly the confidently wrong figure
+ * `parseAmount` exists to avoid.
+ */
+export function scheduleTotals(
+  rows: ScheduleRow[]
+): { subtotal: number; gst: number; payable: number } | null {
+  if (rows.length === 0) return null;
+  if (rows.some((row) => row.payable === null)) return null;
+  return {
+    subtotal: rows.reduce((sum, row) => sum + (row.subtotal ?? 0), 0),
+    gst: rows.reduce((sum, row) => sum + (row.gst ?? 0), 0),
+    payable: rows.reduce((sum, row) => sum + (row.payable ?? 0), 0),
+  };
+}
+
+/**
+ * What the client owes right now: every dated payment whose date has arrived
+ * and which has not been settled.
+ *
+ * This is the figure the payment page leads with, and the one the "pay
+ * everything due" button charges. It accumulates — once the advance falls due
+ * and goes unpaid, the next milestone's date arriving simply adds to it, so a
+ * client who has fallen behind sees one number rather than three.
+ *
+ * Returns null if any due row could not be priced (a range total with no
+ * explicit amount). A partial sum presented as "total due" is exactly the
+ * confidently wrong figure `parseAmount` exists to avoid.
+ */
+export function totalDue(rows: ScheduleRow[]): {
+  rows: ScheduleRow[];
+  subtotal: number;
+  gst: number;
+  payable: number;
+} | null {
+  const due = rows.filter((row) => row.dueState === 'due');
+  if (due.length === 0) return null;
+  if (due.some((row) => row.payable === null)) return null;
+
+  return {
+    rows: due,
+    subtotal: due.reduce((sum, row) => sum + (row.subtotal ?? 0), 0),
+    gst: due.reduce((sum, row) => sum + (row.gst ?? 0), 0),
+    payable: due.reduce((sum, row) => sum + (row.payable ?? 0), 0),
+  };
+}
+
+/** How a due date reads to the client. Null where there is nothing to say. */
+export function dueDateLabel(
+  row: ScheduleRow,
+  today: string = todayIso()
+): string | null {
+  const date = row.milestone.dueDate;
+  if (!date) return null;
+  const words = new Date(`${date}T00:00:00Z`).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  if (row.dueState === 'paid') return `Was due ${words}`;
+  if (date === today) return `Due today`;
+  return row.dueState === 'due' ? `Was due ${words}` : `Due ${words}`;
 }
