@@ -7,6 +7,7 @@ import {
   invoiceBlocks,
   invoiceNumber,
   stateName,
+  parseBilling,
   taxSplit,
 } from '@/lib/gst';
 
@@ -127,6 +128,46 @@ console.log('\ninvoiceBlocks');
     clientAddress: 'A211, Golden I, Noida',
   });
   check('a missing state blocks on its own', noState.length === 1 && noState[0] === 'place-of-supply', noState);
+}
+
+console.log('\nparseBilling');
+{
+  const good = {
+    legalName: 'Atri Home Interiors Pvt Ltd',
+    gstin: '27ABCDE1234F1Z5',
+    state: '27',
+    address: '14 Kalyani Nagar, Pune 411006',
+    invoiceEmail: 'accounts@atri.example',
+  };
+  const ok = parseBilling(good);
+  check('a complete set passes', ok.ok === true);
+  check('the GSTIN is normalised',
+    ok.ok && ok.details.gstin === '27ABCDE1234F1Z5');
+
+  const noGstin = parseBilling({ ...good, gstin: '' });
+  check('an unregistered client is fine', noGstin.ok === true);
+  check('and has no GSTIN', noGstin.ok && noGstin.details.gstin === null);
+
+  check('a missing name is refused',
+    parseBilling({ ...good, legalName: '' }).ok === false);
+  check('a missing address is refused',
+    parseBilling({ ...good, address: '' }).ok === false);
+  check('a missing state is refused',
+    parseBilling({ ...good, state: null }).ok === false);
+  check('a malformed GSTIN is refused',
+    parseBilling({ ...good, gstin: '27ABC' }).ok === false);
+  check('a malformed email is refused',
+    parseBilling({ ...good, invoiceEmail: 'not-an-email' }).ok === false);
+  check('a blank email is allowed',
+    parseBilling({ ...good, invoiceEmail: '' }).ok === true);
+
+  // The one that actually protects the invoice: a GSTIN carries its own
+  // state, so a contradiction must not be silently resolved either way.
+  const clash = parseBilling({ ...good, state: '09' });
+  check('a GSTIN that contradicts the chosen state is refused', clash.ok === false);
+  check('and the message names both states',
+    !clash.ok && clash.error.includes('Maharashtra') && clash.error.includes('Uttar Pradesh'),
+    !clash.ok ? clash.error : '');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

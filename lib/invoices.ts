@@ -210,7 +210,9 @@ export async function issueInvoice(
       issuedAt: issuedAt.toISOString(),
       supplierGstin,
       supplierState: site.gstStateCode,
-      clientName: proposal.client,
+      // The entity the invoice is raised against. Falls back to the contact
+      // name for proposals filled in before the client could supply one.
+      clientName: proposal.clientLegalName.trim() || proposal.client,
       clientAddress: proposal.clientAddress.trim(),
       clientGstin: cleanGstin(proposal.clientGstin),
       placeOfSupply,

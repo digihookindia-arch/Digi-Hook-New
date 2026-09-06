@@ -1,4 +1,5 @@
 import { AlertCircle, Check, Download, Landmark, ShieldCheck } from 'lucide-react';
+import { BillingDetailsForm } from '@/app/proposals/[slug]/payment/BillingDetailsForm';
 import { PayButton } from '@/app/proposals/[slug]/payment/PayButton';
 import {
   dueDateLabel,
@@ -110,6 +111,7 @@ export function PaymentView({
   payments,
   invoices,
   razorpayLive,
+  billing,
 }: {
   slug: string;
   total: string;
@@ -117,8 +119,17 @@ export function PaymentView({
   gstPercent: number;
   payments: Payment[];
   invoices: Invoice[];
-  /** Whether the studio's gateway keys are set. False hides every pay button. */
+  /** Whether the studio's gateway keys are set. False disables every pay button. */
   razorpayLive: boolean;
+  /** The client's own billing identity, which they fill in here. */
+  billing: {
+    legalName: string;
+    gstin: string;
+    state: string | null;
+    address: string;
+    invoiceEmail: string;
+    contactName: string;
+  };
 }) {
   const settled = paidMilestones(payments);
   const schedule = milestoneSchedule(total, milestones, gstPercent, settled);
@@ -140,7 +151,12 @@ export function PaymentView({
    * disabled control with a stated reason is honest, where a control that
    * looks live and does nothing is not.
    */
-  const payBlockedBecause = (isDue: boolean): string | undefined => {
+  const payBlockedBecause = (isDue: boolean, payable: number): string | undefined => {
+    if (payable < 1) {
+      // Razorpay will not take an order below one rupee, so a button here
+      // could only ever fail. Says why rather than vanishing.
+      return 'Nothing to collect on this one — the schedule puts it at zero.';
+    }
     if (!razorpayLive) {
       return 'Card and UPI payment is being switched on for this project. Until it is, we will send you an invoice for this — or call us and we will take it over the phone.';
     }
@@ -219,13 +235,23 @@ export function PaymentView({
                 amountText={formatInr(due.payable)}
                 label="everything due"
                 onDark
-                disabled={!razorpayLive}
-                disabledReason={payBlockedBecause(false)}
+                disabled={!razorpayLive || due.payable < 1}
+                disabledReason={payBlockedBecause(false, due.payable)}
               />
             </div>
           </div>
         </div>
       ) : null}
+
+      <BillingDetailsForm
+        slug={slug}
+        legalName={billing.legalName}
+        gstin={billing.gstin}
+        state={billing.state}
+        address={billing.address}
+        invoiceEmail={billing.invoiceEmail}
+        fallbackName={billing.contactName}
+      />
 
       {schedule.length === 0 ? (
         <p className="m-0 mt-8 rounded-panel bg-panel p-6 text-[15px] leading-[1.6] text-neutral-700 shadow-panel">
@@ -335,8 +361,8 @@ export function PaymentView({
                             amountText={row.payableText ?? ''}
                             label={row.milestone.label}
                             tone="quiet"
-                            disabled={!razorpayLive || isDue}
-                            disabledReason={payBlockedBecause(isDue)}
+                            disabled={!razorpayLive || isDue || (row.payable ?? 0) < 1}
+                            disabledReason={payBlockedBecause(isDue, row.payable ?? 0)}
                           />
                         </div>
                       ) : null}

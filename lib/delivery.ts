@@ -422,6 +422,11 @@ export function scheduleTotals(
  * Returns null if any due row could not be priced (a range total with no
  * explicit amount). A partial sum presented as "total due" is exactly the
  * confidently wrong figure `parseAmount` exists to avoid.
+ *
+ * Also null when the rows add up to nothing. A schedule can legitimately put
+ * zero against a milestone, and "Total due now: ₹0" beside a payment button is
+ * both meaningless and unpayable - Razorpay will not take an order under one
+ * rupee. Nothing owed is not a total due.
  */
 export function totalDue(rows: ScheduleRow[]): {
   rows: ScheduleRow[];
@@ -433,11 +438,14 @@ export function totalDue(rows: ScheduleRow[]): {
   if (due.length === 0) return null;
   if (due.some((row) => row.payable === null)) return null;
 
+  const payable = due.reduce((sum, row) => sum + (row.payable ?? 0), 0);
+  if (payable < 1) return null;
+
   return {
     rows: due,
     subtotal: due.reduce((sum, row) => sum + (row.subtotal ?? 0), 0),
     gst: due.reduce((sum, row) => sum + (row.gst ?? 0), 0),
-    payable: due.reduce((sum, row) => sum + (row.payable ?? 0), 0),
+    payable,
   };
 }
 

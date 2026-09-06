@@ -50,7 +50,9 @@ const SCHEMA = `
     gst_percent INTEGER NOT NULL DEFAULT 18,
     client_address TEXT NOT NULL DEFAULT '',
     client_gstin TEXT NOT NULL DEFAULT '',
-    client_state TEXT
+    client_state TEXT,
+    client_legal_name TEXT NOT NULL DEFAULT '',
+    invoice_email TEXT NOT NULL DEFAULT ''
   );
   CREATE INDEX IF NOT EXISTS proposals_created_at ON proposals (created_at DESC);
 
@@ -605,6 +607,14 @@ export function getDb(): DatabaseSync {
     // queries; this is the full set. Rows written before it read back as the
     // single index they already carry.
     addColumnIfMissing(db, 'payments', 'milestone_indexes', "TEXT NOT NULL DEFAULT ''");
+    // Billing identity the client fills in themselves on the payment stage.
+    // The legal name is the entity a tax invoice is raised against, which is
+    // rarely the person we have been emailing; invoice_email is where the
+    // invoice goes when that is an accounts inbox rather than that person.
+    // Both fall back rather than block: empty legal name uses the client name,
+    // empty invoice_email uses client_email.
+    addColumnIfMissing(db, 'proposals', 'client_legal_name', "TEXT NOT NULL DEFAULT ''");
+    addColumnIfMissing(db, 'proposals', 'invoice_email', "TEXT NOT NULL DEFAULT ''");
     global._dhSqlite = db;
   }
   return global._dhSqlite;

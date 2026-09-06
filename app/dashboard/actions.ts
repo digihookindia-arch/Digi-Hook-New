@@ -153,6 +153,8 @@ export async function createProposal(
     clientAddress: '',
     clientGstin: '',
     clientState: null,
+    clientLegalName: '',
+    invoiceEmail: '',
     createdAt: now,
     updatedAt: now,
     // Accepted later — by the client on the page, or the studio after a call.
@@ -383,6 +385,8 @@ export async function updateBillingAction(formData: FormData): Promise<void> {
     address: String(formData.get('billingAddress') ?? ''),
     gstin: String(formData.get('clientGstin') ?? ''),
     state: String(formData.get('clientState') ?? ''),
+    legalName: String(formData.get('clientLegalName') ?? ''),
+    invoiceEmail: String(formData.get('invoiceEmail') ?? ''),
   });
 
   revalidatePath(`/dashboard/${slug}`);
@@ -424,13 +428,14 @@ export async function issueInvoiceAction(
   }
 
   const { invoice } = issued;
-  if (proposal.clientEmail && !invoice.emailedAt) {
+  const invoiceTo = proposal.invoiceEmail.trim() || proposal.clientEmail;
+  if (invoiceTo && !invoice.emailedAt) {
     // Best-effort, like every other send in this codebase: the invoice exists
     // and is downloadable either way, and a mail failure must not leave the
     // studio thinking no invoice was raised.
     try {
       await sendEmail({
-        to: proposal.clientEmail,
+        to: invoiceTo,
         ...invoiceIssuedEmail({
           name: proposal.client,
           slug: proposal.slug,

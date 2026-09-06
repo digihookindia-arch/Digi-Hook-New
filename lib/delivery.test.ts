@@ -215,5 +215,16 @@ check('rows stored before the column read back undated',
   parseMilestones([{ label: 'X', percent: 0, status: 'pending', note: '' }])[0]?.dueDate === null);
 
 
+check('a schedule of zeroes owes nothing, not ₹0',
+  totalDue(milestoneSchedule('₹30,000', [
+    { label: 'a', percent: 0, status: 'pending', note: '', amount: null, dueDate: '2026-08-01' },
+    { label: 'b', percent: 0, status: 'pending', note: '', amount: null, dueDate: '2026-08-02' },
+  ], 18, new Set(), TODAY)) === null);
+
+check('one rupee is still owed',
+  totalDue(milestoneSchedule('₹100', [
+    { label: 'a', percent: 1, status: 'pending', note: '', amount: null, dueDate: '2026-08-01' },
+  ], 0, new Set(), TODAY))?.payable === 1);
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) process.exit(1);

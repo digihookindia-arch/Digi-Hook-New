@@ -279,3 +279,81 @@ export function invoiceTotals(input: {
     split: taxSplit(input),
   };
 }
+
+/* ── the billing details a client fills in themselves ───────────────────── */
+
+export type BillingInput = {
+  legalName: string;
+  gstin: string;
+  state: string | null;
+  address: string;
+  invoiceEmail: string;
+};
+
+export type BillingDetails = {
+  legalName: string;
+  gstin: string | null;
+  state: string;
+  address: string;
+  invoiceEmail: string;
+};
+
+/**
+ * Validates what a client types into the billing form on their payment page.
+ *
+ * Returns either the cleaned values or the *first* problem, phrased for the
+ * person who typed it rather than for a developer — this form is the one place
+ * a paying client is asked to do data entry, and "invalid input" would tell
+ * them nothing.
+ *
+ * The load-bearing check is the last one. A GSTIN carries its own state in its
+ * first two digits, so a GSTIN that disagrees with the chosen state is a
+ * contradiction, and picking either one silently would put the wrong place of
+ * supply on a tax invoice. It refuses instead.
+ */
+export function parseBilling(
+  input: BillingInput
+): { ok: true; details: BillingDetails } | { ok: false; error: string } {
+  const legalName = input.legalName.trim().slice(0, 200);
+  if (legalName.length < 2) {
+    return { ok: false, error: 'Enter the name the invoice should be made out to.' };
+  }
+
+  const address = input.address.trim().slice(0, 400);
+  if (address.length < 6) {
+    return { ok: false, error: 'Enter your billing address, including the city and PIN code.' };
+  }
+
+  const state = cleanStateCode(input.state);
+  if (!state) {
+    return { ok: false, error: 'Choose your state — it decides how GST is split on the invoice.' };
+  }
+
+  // Optional: plenty of clients are not GST registered, and that is an
+  // ordinary B2C supply rather than a problem.
+  const typedGstin = input.gstin.trim();
+  const gstin = typedGstin ? cleanGstin(typedGstin) : null;
+  if (typedGstin && !gstin) {
+    return {
+      ok: false,
+      error: 'That GSTIN does not look right — it should be 15 characters, like 09ABCDE1234F1Z5. Leave it blank if you are not registered.',
+    };
+  }
+
+  const invoiceEmail = input.invoiceEmail.trim().slice(0, 200);
+  if (invoiceEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invoiceEmail)) {
+    return { ok: false, error: 'That email address does not look right.' };
+  }
+
+  if (gstin && gstinState(gstin) !== state) {
+    const fromGstin = stateName(gstinState(gstin));
+    return {
+      ok: false,
+      error: fromGstin
+        ? `Your GSTIN is registered in ${fromGstin}, but you have chosen ${stateName(state)}. Please pick the state your GSTIN belongs to.`
+        : 'That GSTIN does not match the state you have chosen.',
+    };
+  }
+
+  return { ok: true, details: { legalName, gstin, state, address, invoiceEmail } };
+}

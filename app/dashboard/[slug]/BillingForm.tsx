@@ -55,6 +55,27 @@ export function BillingForm({ proposal }: { proposal: Proposal }) {
       <form action={updateBillingAction} className="p-[18px]">
         <input type="hidden" name="slug" value={proposal.slug} />
 
+        <label className="mb-4 block">
+          <Label>Billed to (registered name)</Label>
+          <input
+            name="clientLegalName"
+            className={inputClass}
+            defaultValue={proposal.clientLegalName}
+            placeholder={proposal.client}
+          />
+        </label>
+
+        <label className="mb-4 block">
+          <Label>Send invoices to</Label>
+          <input
+            name="invoiceEmail"
+            type="email"
+            className={inputClass}
+            defaultValue={proposal.invoiceEmail}
+            placeholder={proposal.clientEmail || 'accounts@client.com'}
+          />
+        </label>
+
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-4">
           <label className="block">
             <Label>Client state (place of supply)</Label>
@@ -97,7 +118,13 @@ export function BillingForm({ proposal }: { proposal: Proposal }) {
         <p className="m-0 mt-3 max-w-[70ch] text-[12.5px] leading-[1.55] text-neutral-700">
           An unregistered client is fine — leave the GSTIN blank and the invoice
           says so. The state is still required either way, because it decides the
-          tax split.
+          tax split. Blank fields fall back: the registered name to the client
+          name, the invoice address to their usual one.
+        </p>
+        <p className="m-0 mt-2 max-w-[70ch] text-[12.5px] leading-[1.55] text-neutral-700">
+          The client can fill these in themselves on their Payment stage, which
+          is usually better — they know their own GSTIN. Whatever they save
+          shows up here.
         </p>
 
         <button

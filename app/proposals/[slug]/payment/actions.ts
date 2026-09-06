@@ -13,7 +13,8 @@ import {
   paidMilestones,
   paymentReference,
 } from '@/lib/payments';
-import { getProposal, type Proposal } from '@/lib/proposals';
+import { parseBilling } from '@/lib/gst';
+import { getProposal, setProposalBilling, type Proposal } from '@/lib/proposals';
 import { proposalRef } from '@/lib/proposalDoc';
 import {
   createOrder,
@@ -125,6 +126,15 @@ export async function startPayment(input: {
   const subtotal = rows.reduce((sum, row) => sum + (row.subtotal ?? 0), 0);
   const gst = rows.reduce((sum, row) => sum + (row.gst ?? 0), 0);
   const payable = rows.reduce((sum, row) => sum + (row.payable ?? 0), 0);
+
+  // Razorpay's floor is one rupee, so an order below it can only fail. Better
+  // to say why than to hand the client a gateway error.
+  if (payable < 1) {
+    return {
+      ok: false,
+      error: 'There is nothing to collect on that one - the schedule puts it at zero.',
+    };
+  }
   const label =
     rows.length === 1
       ? (rows[0]?.milestone.label ?? '')
@@ -228,4 +238,69 @@ export async function confirmPayment(input: {
   revalidatePath(`/proposals/${input.slug}/payment`);
   revalidatePath(`/proposals/${input.slug}/status`);
   return { ok: true };
+}
+
+export type BillingState = {
+  error?: string;
+  savedAt?: string;
+  /**
+   * What the client typed, echoed back when validation fails.
+   *
+   * React 19 resets an uncontrolled form once its action resolves, so without
+   * this a rejected GSTIN would wipe all five fields and the client would
+   * retype their address to fix a typo. The form seeds its defaults from here
+   * when present.
+   */
+  values?: {
+    legalName: string;
+    gstin: string;
+    state: string;
+    address: string;
+    invoiceEmail: string;
+  };
+};
+
+/**
+ * The client fills in their own billing identity from the payment stage.
+ *
+ * They know it better than we do — the registered entity name is rarely the
+ * person we have been emailing, and the GSTIN is theirs to get right. Guarded
+ * by the same access cookie as paying: whoever can see the schedule can say
+ * who the invoice is made out to.
+ *
+ * Editable afterwards, and safe to edit, because every invoice freezes its own
+ * copy at issue time. Correcting a typo here does not rewrite an invoice
+ * already sent — it only changes what the next one says.
+ */
+export async function saveBillingDetails(
+  _prev: BillingState,
+  formData: FormData
+): Promise<BillingState> {
+  const slug = String(formData.get('slug') ?? '');
+
+  const proposal = await unlocked(slug);
+  if (!proposal) return { error: 'Enter your access code again before saving.' };
+
+  const submitted = {
+    legalName: String(formData.get('legalName') ?? ''),
+    gstin: String(formData.get('gstin') ?? ''),
+    state: String(formData.get('state') ?? ''),
+    address: String(formData.get('address') ?? ''),
+    invoiceEmail: String(formData.get('invoiceEmail') ?? ''),
+  };
+
+  const parsed = parseBilling({ ...submitted, state: submitted.state || null });
+  if (!parsed.ok) return { error: parsed.error, values: submitted };
+
+  await setProposalBilling(slug, {
+    address: parsed.details.address,
+    gstin: parsed.details.gstin ?? '',
+    state: parsed.details.state,
+    legalName: parsed.details.legalName,
+    invoiceEmail: parsed.details.invoiceEmail,
+  });
+
+  revalidatePath(`/proposals/${slug}/payment`);
+  revalidatePath(`/dashboard/${slug}`);
+  return { savedAt: new Date().toISOString() };
 }

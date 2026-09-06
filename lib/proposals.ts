@@ -120,6 +120,16 @@ export type Proposal = {
   clientAddress: string;
   clientGstin: string;
   clientState: string | null;
+  /**
+   * The entity a tax invoice is raised against — often a company where
+   * `client` is the person we deal with. Empty falls back to `client`.
+   */
+  clientLegalName: string;
+  /**
+   * Where invoices go, when that differs from the person we correspond with —
+   * an accounts inbox, usually. Empty falls back to `clientEmail`.
+   */
+  invoiceEmail: string;
   createdAt: string;
   updatedAt: string;
   /**
@@ -167,6 +177,8 @@ type Row = {
   client_address: string | null;
   client_gstin: string | null;
   client_state: string | null;
+  client_legal_name: string | null;
+  invoice_email: string | null;
   created_at: string;
   updated_at: string;
   assets: string;
@@ -191,6 +203,8 @@ function toProposal(row: Row): Proposal {
     clientAddress: row.client_address ?? '',
     clientGstin: row.client_gstin ?? '',
     clientState: row.client_state ?? null,
+    clientLegalName: row.client_legal_name ?? '',
+    invoiceEmail: row.invoice_email ?? '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     acceptedAt: row.accepted_at ?? null,
@@ -230,8 +244,8 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
          (slug, client, access_code, content, brief, created_at, updated_at,
           assets, milestones, stages, accepted_at, assets_shared_at, budget,
           client_email, client_phone, gst_percent, client_address,
-          client_gstin, client_state)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          client_gstin, client_state, client_legal_name, invoice_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(slug) DO UPDATE SET
          client      = excluded.client,
          access_code = excluded.access_code,
@@ -249,7 +263,9 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
          gst_percent  = excluded.gst_percent,
          client_address = excluded.client_address,
          client_gstin = excluded.client_gstin,
-         client_state = excluded.client_state`
+         client_state = excluded.client_state,
+         client_legal_name = excluded.client_legal_name,
+         invoice_email = excluded.invoice_email`
     )
     .run(
       proposal.slug,
@@ -274,7 +290,9 @@ export async function saveProposal(proposal: Proposal): Promise<void> {
       cleanGstPercent(proposal.gstPercent),
       proposal.clientAddress ?? '',
       proposal.clientGstin ?? '',
-      proposal.clientState ?? null
+      proposal.clientState ?? null,
+      proposal.clientLegalName ?? '',
+      proposal.invoiceEmail ?? ''
     );
 }
 
@@ -300,16 +318,27 @@ export async function setProposalAccepted(
  */
 export async function setProposalBilling(
   slug: string,
-  billing: { address: string; gstin: string; state: string | null }
+  billing: {
+    address: string;
+    gstin: string;
+    state: string | null;
+    legalName: string;
+    invoiceEmail: string;
+  }
 ): Promise<void> {
   getDb()
     .prepare(
-      'UPDATE proposals SET client_address = ?, client_gstin = ?, client_state = ? WHERE slug = ?'
+      `UPDATE proposals
+          SET client_address = ?, client_gstin = ?, client_state = ?,
+              client_legal_name = ?, invoice_email = ?
+        WHERE slug = ?`
     )
     .run(
       billing.address.trim().slice(0, 400),
       cleanGstin(billing.gstin) ?? '',
       cleanStateCode(billing.state),
+      billing.legalName.trim().slice(0, 200),
+      billing.invoiceEmail.trim().slice(0, 200),
       slug
     );
 }

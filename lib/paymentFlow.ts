@@ -122,13 +122,17 @@ async function notify(payment: Payment): Promise<void> {
     const proposal = await getProposal(payment.proposalSlug);
     if (!proposal) return;
 
+    // Invoices go to the accounts inbox when the client named one; everything
+    // else still goes to the person we correspond with.
+    const invoiceTo = proposal.invoiceEmail.trim() || proposal.clientEmail;
+
     const issued = await issueInvoice(proposal, payment);
 
     if (issued.ok) {
       const { invoice } = issued;
-      if (proposal.clientEmail) {
+      if (invoiceTo) {
         await sendEmail({
-          to: proposal.clientEmail,
+          to: invoiceTo,
           ...invoiceIssuedEmail({
             name: proposal.client,
             slug: proposal.slug,
@@ -145,9 +149,9 @@ async function notify(payment: Payment): Promise<void> {
         });
         await markInvoiceEmailed(invoice.id);
       }
-    } else if (proposal.clientEmail) {
+    } else if (invoiceTo) {
       await sendEmail({
-        to: proposal.clientEmail,
+        to: invoiceTo,
         ...paymentReceiptEmail({
           name: proposal.client,
           slug: proposal.slug,

@@ -35,6 +35,14 @@ export default async function ProposalPaymentPage({
       payments={await listPayments(slug)}
       invoices={await listInvoices(slug)}
       razorpayLive={isRazorpayConfigured()}
+      billing={{
+        legalName: proposal.clientLegalName,
+        gstin: proposal.clientGstin,
+        state: proposal.clientState,
+        address: proposal.clientAddress,
+        invoiceEmail: proposal.invoiceEmail,
+        contactName: proposal.client,
+      }}
     />
   );
 }
