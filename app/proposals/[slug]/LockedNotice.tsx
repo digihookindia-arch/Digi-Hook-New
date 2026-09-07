@@ -17,9 +17,9 @@ export function LockedNotice({ slug }: { slug: string }) {
         This opens once the proposal is accepted.
       </h2>
       <p className="m-0 mt-4 max-w-[56ch] text-[15.5px] leading-[1.7] text-neutral-800">
-        Once you accept, the other stages open: what we need from you, where the
-        work has got to, and the payment schedule with your receipts — live, for
-        the whole project.
+        Once you accept, the other two stages open: where the work has got to,
+        and the payment schedule with your invoices and receipts — live, for the
+        whole project. We will call you within 24 hours of accepting.
       </p>
       <Link
         href={`/proposals/${slug}`}

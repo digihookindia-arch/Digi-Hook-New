@@ -205,23 +205,35 @@ search three ways: `noindex`, `robots.ts` disallow, and absence from the sitemap
 prefilled from the enquiry and links the two on save.
 
 ### Client-facing proposal stages
-`/proposals/<slug>` has four numbered stages — 01 the proposal, 02 `/assets`
-("what we need from you"), 03 `/status` (work stages) and 04 `/payment`
-(the schedule, GST and online payment). The access-code gate lives in
-`app/proposals/[slug]/layout.tsx` and covers all four.
+`/proposals/<slug>` has three numbered stages — 01 the proposal, 02 `/status`
+(work stages) and 03 `/payment` (the schedule, GST and online payment). The
+access-code gate lives in `app/proposals/[slug]/layout.tsx` and covers all three.
 
-**Navigation is a contents column down the left**, not a row of tabs
-(`ProposalNav.tsx`, client's direction 2026-09-06) — numbered like the
-document's own sections, each with a line saying what is behind it, which is
-what a column has room for and a tab row does not. The layout is
-`flex-wrap` with a 200px-basis nav and a `flex-[999_1_540px]` document: the
-999 makes the document swallow all free space side by side, and when the two no
-longer fit the nav wraps onto its own row where its `flex-grow: 1` spreads it
-full width. **No breakpoint, and none is needed.** `sticky` sits on the `<nav>`
-inside the flex item, never on the item — a stretched flex item is the
-containing block, so `sticky` on the item resolves against a box exactly as
-tall as the nav and scrolls away instantly. Same trap as the grid `<aside>`
-below.
+**"What we need" was removed 2026-09-07** (client's direction). Putting a file
+checklist in front of someone who has just agreed to spend money made a chore of
+the moment they said yes; the studio calls within 24 hours and asks in the
+conversation instead. The asset list survives in the dashboard as an internal
+checklist — `assets` / `assets_shared_at` and `setAssetsShared` are still in the
+schema and still written, they just have no client-facing surface. Do not wire
+one back up without asking.
+
+**Accepting emails the studio.** Until 2026-09-07 it silently set a timestamp
+and nobody was told, while the page promised contact within 24 hours — a promise
+with nothing behind it. `notifyAccepted` in `app/proposals/[slug]/actions.ts`
+now alerts the studio (reply-to set to the client) and sends the client the
+stage-4 milestone email. Both best-effort after the write, and **only on the
+first acceptance** — a double-click must not file a second alert.
+
+**Navigation is a horizontal bar pinned to the top** (`ProposalNav.tsx`).
+It was a left-hand contents column for a day — the client sketched that, then
+asked for the bar once the labels came down to one word each. Three stages, one
+word apiece: a stage whose name needs a sentence will be skipped, and the page
+underneath says everything the old descriptions did.
+
+`sticky` sits on the `<nav>` itself, which is a direct child of the tall page
+column. **Never wrap it in a div for spacing** — a wrapper only as tall as the
+bar becomes the containing block and the bar scrolls away instantly. Same trap
+as the grid `<aside>` noted below.
 
 **`/proposals` is chrome-free** — it is in `SiteChrome`'s excluded prefixes
 alongside `/portal`, so the marketing header and footer do not render. A client

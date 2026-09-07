@@ -5,41 +5,30 @@ import { usePathname } from 'next/navigation';
 import { Check, Lock } from 'lucide-react';
 
 /**
- * The proposal's contents column: the four stages of one engagement, stacked
- * down the left like the section index on a printed contract. The client asked
- * for this shape specifically (sketched, 2026-09-06) — do not turn it back
- * into a row of tabs.
+ * The three stages of the engagement, as a bar that stays at the top of the
+ * screen.
  *
- * Numbered the same way the document numbers its own sections, so "04" means
- * the same thing in the margin as it does on the page, and each stage carries
- * a line saying what is behind it — which is what a column has room for and a
- * tab row does not.
+ * Three, not four: "What we need" was removed at the client's direction
+ * (2026-09-07). Collecting files through a checklist put a chore in front of
+ * someone who had just agreed to spend money; the studio makes contact within
+ * 24 hours instead and asks for what it needs in that conversation.
  *
- * Until the proposal is accepted, stages two to four render greyed and
- * non-navigable: there is nothing to collect, track or bill against a project
- * nobody has agreed to. Every sub-page re-checks acceptance server-side, so
- * this is presentation, not the gate.
+ * Labels are one word each, on purpose. A stage whose name needs a sentence to
+ * explain it is a stage that will be skipped, and the page underneath says
+ * everything the old descriptions did.
  *
- * Sticky inside its column, so a client reading the annexure can still reach
- * the payment stage. The `sticky` lives on this nav rather than on the flex
- * item that holds it — a stretched flex item is the containing block, and
- * putting `sticky` on the item itself would resolve it against a box exactly
- * as tall as the nav, which scrolls away instantly. Same trap as the grid
- * `<aside>` noted in CLAUDE.md.
+ * Until the proposal is accepted, Status and Payment render greyed and
+ * non-navigable — there is nothing to track or bill against a project nobody
+ * has agreed to. Every sub-page re-checks acceptance server-side, so this is
+ * presentation, not the gate.
  */
 
-type Stage = {
-  label: string;
-  hint: string;
-  gated: boolean;
-  path: string;
-};
+type Stage = { label: string; path: string; gated: boolean };
 
 const STAGES: Stage[] = [
-  { path: '', label: 'Proposal', hint: 'Scope, timeline and cost', gated: false },
-  { path: '/assets', label: 'What we need', hint: 'Files and access from you', gated: true },
-  { path: '/status', label: 'Status', hint: 'Where the work has got to', gated: true },
-  { path: '/payment', label: 'Payment', hint: 'Invoices and online payment', gated: true },
+  { path: '', label: 'Proposal', gated: false },
+  { path: '/status', label: 'Status', gated: true },
+  { path: '/payment', label: 'Payment', gated: true },
 ];
 
 export function ProposalNav({
@@ -53,26 +42,29 @@ export function ProposalNav({
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Proposal sections" className="sticky top-6">
-      <div className="mb-3.5 px-1 text-[11px] font-semibold uppercase leading-none tracking-[0.16em] text-neutral-700">
-        This proposal
-      </div>
-
-      <ul className="m-0 grid list-none gap-1.5 p-0">
+    <nav
+      aria-label="Proposal sections"
+      data-print-hide
+      /* Sticky against the page, which is why it is a direct child of the
+         document column rather than wrapped: a wrapper only as tall as the bar
+         becomes the containing block and the bar scrolls away at once. */
+      className="sticky top-0 z-30 border-b border-neutral-300 bg-bg/95 backdrop-blur"
+    >
+      <div className="mx-auto flex max-w-[900px] list-none flex-wrap items-stretch gap-2 px-gutter py-2.5">
         {STAGES.map((stage, i) => {
           const href = `${base}${stage.path}`;
           const number = String(i + 1).padStart(2, '0');
           const active = pathname === href;
           const locked = stage.gated && !accepted;
-          // Stage 01 is done the moment the proposal is agreed; the rest are
-          // tracked elsewhere, so the tick here means "agreed", nothing more.
+          // The tick means "agreed", nothing more — the later stages track
+          // themselves.
           const done = i === 0 && accepted && !active;
 
-          const body = (
+          const inner = (
             <>
               <span
                 aria-hidden="true"
-                className={`mt-[1px] font-heading text-[11.5px] font-extrabold leading-none tracking-[0.02em] ${
+                className={`font-heading text-[11px] font-extrabold leading-none tracking-[0.04em] ${
                   active
                     ? 'text-accent-400'
                     : locked
@@ -82,63 +74,47 @@ export function ProposalNav({
               >
                 {number}
               </span>
-              <span className="min-w-0">
-                <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14.5px] font-semibold leading-[1.25]">
-                  {stage.label}
-                  {locked ? (
-                    <Lock size={11} aria-hidden="true" className="text-neutral-500" />
-                  ) : done ? (
-                    <Check
-                      size={12}
-                      strokeWidth={3}
-                      aria-hidden="true"
-                      className="text-accent"
-                    />
-                  ) : null}
-                </span>
-                <span
-                  className={`mt-1 block text-[12.5px] leading-[1.4] ${
-                    active ? 'text-neutral-400' : 'text-neutral-700'
-                  }`}
-                >
-                  {locked ? 'Opens once you accept' : stage.hint}
-                </span>
+              <span className="text-[14.5px] font-semibold leading-none">
+                {stage.label}
               </span>
+              {locked ? (
+                <Lock size={12} aria-hidden="true" className="text-neutral-500" />
+              ) : done ? (
+                <Check
+                  size={13}
+                  strokeWidth={3}
+                  aria-hidden="true"
+                  className="text-accent"
+                />
+              ) : null}
             </>
           );
 
-          return (
-            <li key={href}>
-              {locked ? (
-                <span
-                  aria-disabled="true"
-                  className="grid cursor-not-allowed grid-cols-[22px_minmax(0,1fr)] items-start gap-2.5 rounded-panel-sm px-3.5 py-3 text-neutral-500"
-                >
-                  {body}
-                </span>
-              ) : (
-                <Link
-                  href={href}
-                  aria-current={active ? 'page' : undefined}
-                  className={`grid min-h-[58px] grid-cols-[22px_minmax(0,1fr)] items-start gap-2.5 rounded-panel-sm px-3.5 py-3 transition-colors ${
-                    active
-                      ? 'bg-text text-bg shadow-panel'
-                      : 'text-neutral-800 hover:bg-panel hover:shadow-panel'
-                  }`}
-                >
-                  {body}
-                </Link>
-              )}
-            </li>
+          return locked ? (
+            <span
+              key={href}
+              aria-disabled="true"
+              title="Opens once you accept the proposal"
+              className="inline-flex min-h-[44px] cursor-not-allowed items-center gap-2.5 rounded-panel-sm px-4 text-neutral-500"
+            >
+              {inner}
+            </span>
+          ) : (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? 'page' : undefined}
+              className={`inline-flex min-h-[44px] items-center gap-2.5 rounded-panel-sm px-4 transition-colors ${
+                active
+                  ? 'bg-text text-bg shadow-panel'
+                  : 'text-neutral-800 hover:bg-panel hover:shadow-panel'
+              }`}
+            >
+              {inner}
+            </Link>
           );
         })}
-      </ul>
-
-      {!accepted ? (
-        <p className="m-0 mt-4 px-1 text-[12.5px] leading-[1.5] text-neutral-700">
-          Stages 02 to 04 open as soon as you accept.
-        </p>
-      ) : null}
+      </div>
     </nav>
   );
 }

@@ -14,7 +14,6 @@ import {
   requireSession,
   removeProposal,
   setAcceptedAction,
-  setAssetsSharedAction,
 } from '../actions';
 import {
   sendMilestoneAction,
@@ -146,15 +145,7 @@ export default async function EditProposalPage({
           </div>
           <p className="m-0 p-[18px] text-[13.5px] leading-[1.55] text-neutral-700">
             The page is blocked from search engines and needs the code to open. Send
-            both to the client. The same code opens all three tabs —{' '}
-            <Link
-              href={`/proposals/${proposal.slug}/assets`}
-              target="_blank"
-              className="border-b border-accent text-accent-700"
-            >
-              what we need
-            </Link>{' '}
-            and{' '}
+            both to the client. The same code opens all three stages —{' '}
             <Link
               href={`/proposals/${proposal.slug}/status`}
               target="_blank"
@@ -254,57 +245,6 @@ export default async function EditProposalPage({
         <div className="mb-10 border-t-2 border-text pt-8">
           <div className="mb-6 text-[12px] font-semibold uppercase leading-none tracking-[0.14em] text-accent-700">
             Delivery
-          </div>
-
-          {/* Publishing the asset list is its own step: the client sees a
-              "within 24 hours" notice until this is pressed, so the list they
-              get is one the studio actually edited down for their project. */}
-          <div className="mb-7 border-2 border-text">
-            <div className="bg-text px-[18px] py-3.5 text-[11.5px] font-semibold uppercase leading-[1.3] tracking-[0.14em] text-bg">
-              What we need — visible to the client?
-            </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-3 p-[18px]">
-              {proposal.assetsSharedAt ? (
-                <>
-                  <span className="text-[13.5px] font-semibold leading-none text-accent-700">
-                    Shared {new Date(proposal.assetsSharedAt).toLocaleDateString('en-IN')}
-                  </span>
-                  <span className="text-[13.5px] leading-[1.5] text-neutral-700">
-                    The client can see the list below.
-                  </span>
-                  <form action={setAssetsSharedAction}>
-                    <input type="hidden" name="slug" value={proposal.slug} />
-                    <input type="hidden" name="shared" value="no" />
-                    <button
-                      type="submit"
-                      className="border-2 border-neutral-400 px-3 py-2 text-[12.5px] font-medium leading-none text-neutral-800 transition-colors hover:border-accent-700 hover:text-accent-700"
-                    >
-                      Unshare
-                    </button>
-                  </form>
-                </>
-              ) : (
-                <>
-                  <span className="text-[13.5px] leading-[1.5] text-neutral-700">
-                    Not shared yet.{' '}
-                    {proposal.acceptedAt
-                      ? 'The client is seeing “we will send this within 24 hours”.'
-                      : 'The client cannot open this tab until they accept.'}{' '}
-                    Edit the list below first, then share.
-                  </span>
-                  <form action={setAssetsSharedAction}>
-                    <input type="hidden" name="slug" value={proposal.slug} />
-                    <input type="hidden" name="shared" value="yes" />
-                    <button
-                      type="submit"
-                      className="inline-flex min-h-[40px] items-center border-2 border-accent-600 bg-accent-600 px-4 text-[12.5px] font-semibold leading-none text-white transition-colors hover:border-accent-700 hover:bg-accent-700"
-                    >
-                      Share this list with the client
-                    </button>
-                  </form>
-                </>
-              )}
-            </div>
           </div>
 
           <DeliveryEditor

@@ -78,79 +78,65 @@ export default async function ProposalLayout({
       <Letterhead reference={ref} printable />
       <ProposalCover proposal={proposal} payments={await listPayments(slug)} />
 
-      <div className="mx-auto max-w-[1140px] px-gutter py-[clamp(44px,6vw,80px)]">
-        {/* Contents column, then the document. Asymmetric, so `flex-wrap` with
-            basis widths rather than a grid — and no breakpoint anywhere.
+      <ProposalNav slug={slug} accepted={accepted} />
 
-            The growth factors do the responsive work. On a wide viewport the
-            document's 999 swallows every pixel of free space and the contents
-            column sits at its 220px basis; once the two no longer fit side by
-            side, the column wraps onto a row of its own, where its own
-            `flex-grow: 1` spreads it to the full width. */}
-        <div className="flex flex-wrap items-stretch gap-x-[clamp(28px,3.5vw,60px)] gap-y-10">
-          <div data-print-hide className="flex-[1_1_220px]">
-            <ProposalNav slug={slug} accepted={accepted} />
-          </div>
+      <div className="mx-auto max-w-[900px] px-gutter py-[clamp(36px,5vw,64px)]">
+        {children}
 
-          <div className="min-w-0 flex-[999_1_540px]">
-            {children}
+        <div className="mt-[clamp(48px,6vw,80px)] rounded-panel bg-panel p-[clamp(26px,4vw,44px)] shadow-panel">
+          <h2 className="m-0 mb-3 font-heading text-[clamp(21px,2.4vw,30px)] font-bold leading-[1.12] tracking-[-0.03em]">
+            Questions on any of this?
+          </h2>
+          <p className="m-0 mb-6 max-w-[52ch] text-[15.5px] leading-[1.65] text-neutral-800">
+            Call us and we will walk through it line by line. Nothing here is
+            fixed until you are happy with it.
+          </p>
 
-            <div className="mt-[clamp(48px,6vw,80px)] rounded-panel bg-panel p-[clamp(26px,4vw,44px)] shadow-panel">
-              <h2 className="m-0 mb-3 font-heading text-[clamp(21px,2.4vw,30px)] font-bold leading-[1.12] tracking-[-0.03em]">
-                Questions on any of this?
-              </h2>
-              <p className="m-0 mb-6 max-w-[52ch] text-[15.5px] leading-[1.65] text-neutral-800">
-                Call us and we will walk through it line by line. Nothing here is
-                fixed until you are happy with it.
-              </p>
-
-              <div className="flex flex-wrap items-start gap-x-12 gap-y-6">
-                <div>
-                  <div className="mb-2 text-[11px] font-semibold uppercase leading-none tracking-[0.14em] text-accent-700">
-                    Talk to us
-                  </div>
-                  <a
-                    href={`tel:${site.phoneHref}`}
-                    className="font-heading text-[clamp(21px,2.2vw,28px)] font-bold leading-none tracking-[-0.03em] text-accent-700"
-                  >
-                    {site.phoneDisplay}
-                  </a>
-                  <div className="mt-2.5 text-[13.5px] leading-[1.6] text-neutral-700">
-                    {site.email}
-                    <br />
-                    {site.hoursLine}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-2 text-[11px] font-semibold uppercase leading-none tracking-[0.14em] text-accent-700">
-                    Prepared by
-                  </div>
-                  <div className="font-heading text-[16px] font-bold leading-[1.3] tracking-[-0.02em]">
-                    {site.legalName}
-                  </div>
-                  <div className="mt-2 text-[13.5px] leading-[1.6] text-neutral-700">
-                    {site.addressLine}
-                    {/* Rendered only when the studio has supplied one. A
-                        document that adds GST without naming the registration
-                        it is collected under is not one an accountant can
-                        file, and an invented number is worse than none. */}
-                    {site.gstin ? (
-                      <>
-                        <br />
-                        GSTIN {site.gstin}
-                      </>
-                    ) : null}
-                  </div>
-                </div>
+          <div className="flex flex-wrap items-start gap-x-12 gap-y-6">
+            <div>
+              <div className="mb-2 text-[11px] font-semibold uppercase leading-none tracking-[0.14em] text-accent-700">
+                Talk to us
               </div>
+              <a
+                href={`tel:${site.phoneHref}`}
+                className="font-heading text-[clamp(21px,2.2vw,28px)] font-bold leading-none tracking-[-0.03em] text-accent-700"
+              >
+                {site.phoneDisplay}
+              </a>
+              <div className="mt-2.5 text-[13.5px] leading-[1.6] text-neutral-700">
+                {site.email}
+                <br />
+                {site.hoursLine}
+              </div>
+            </div>
 
-              <p className="m-0 mt-8 border-t border-neutral-200 pt-5 text-[12px] leading-[1.55] text-neutral-700">
-                Reference {ref} · Prepared for {proposal.client}. This document is
-                confidential.
-              </p>
+            <div>
+              <div className="mb-2 text-[11px] font-semibold uppercase leading-none tracking-[0.14em] text-accent-700">
+                Prepared by
+              </div>
+              <div className="font-heading text-[16px] font-bold leading-[1.3] tracking-[-0.02em]">
+                {site.legalName}
+              </div>
+              <div className="mt-2 text-[13.5px] leading-[1.6] text-neutral-700">
+                {site.addressLine}
+                {/* Rendered only when the studio has supplied one. A
+                    document that adds GST without naming the registration
+                    it is collected under is not one an accountant can
+                    file, and an invented number is worse than none. */}
+                {site.gstin ? (
+                  <>
+                    <br />
+                    GSTIN {site.gstin}
+                  </>
+                ) : null}
+              </div>
             </div>
           </div>
+
+          <p className="m-0 mt-8 border-t border-neutral-200 pt-5 text-[12px] leading-[1.55] text-neutral-700">
+            Reference {ref} · Prepared for {proposal.client}. This document is
+            confidential.
+          </p>
         </div>
       </div>
     </main>

@@ -1,10 +1,5 @@
-import { Check, Circle, Loader } from 'lucide-react';
-import {
-  ASSET_LABELS,
-  STAGE_LABELS,
-  type AssetItem,
-  type WorkStage,
-} from '@/lib/delivery';
+import { Loader } from 'lucide-react';
+import { STAGE_LABELS, type WorkStage } from '@/lib/delivery';
 
 /**
  * The client-facing render of the studio's delivery records. Read-only by
@@ -65,75 +60,6 @@ function Empty({ children }: { children: React.ReactNode }) {
     <p className="m-0 mt-8 rounded-panel bg-panel p-6 text-[15px] leading-[1.6] text-neutral-700 shadow-panel">
       {children}
     </p>
-  );
-}
-
-/* ── what the client owes us ────────────────────────────────────────────── */
-
-export function AssetsView({ assets }: { assets: AssetItem[] }) {
-  const outstanding = assets.filter((a) => a.status === 'pending').length;
-
-  return (
-    <section>
-      <StageHeading
-        number="02"
-        title="What we need from you"
-        lead={
-          assets.length === 0
-            ? 'We will list anything we need from you here as the project starts.'
-            : outstanding === 0
-              ? 'Everything we asked for has arrived. Nothing is waiting on you.'
-              : `${outstanding} of ${assets.length} ${outstanding === 1 ? 'item is' : 'items are'} still with you. Send whatever is ready — you do not have to send it all at once.`
-        }
-      />
-
-      {assets.length === 0 ? (
-        <Empty>Nothing to collect yet.</Empty>
-      ) : (
-        <ul className="m-0 mt-9 grid list-none gap-3.5 p-0">
-          {assets.map((asset, i) => (
-            <li key={`${asset.label}-${i}`}>
-              <div className="break-inside-avoid rounded-panel bg-panel p-[clamp(18px,2.5vw,26px)] shadow-panel">
-                <div className="grid grid-cols-[30px_minmax(0,1fr)] gap-3">
-                  {asset.status === 'received' ? (
-                    <Check
-                      size={18}
-                      strokeWidth={3}
-                      aria-hidden="true"
-                      className="mt-[3px] text-accent"
-                    />
-                  ) : (
-                    <Circle
-                      size={16}
-                      strokeWidth={2.5}
-                      aria-hidden="true"
-                      className="mt-[4px] text-neutral-500"
-                    />
-                  )}
-                  <div>
-                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2">
-                      <h3 className="m-0 font-heading text-[17.5px] font-bold leading-[1.2] tracking-[-0.025em]">
-                        {asset.label}
-                      </h3>
-                      <StatusPill
-                        tone={asset.status === 'received' ? 'done' : 'waiting'}
-                      >
-                        {ASSET_LABELS[asset.status]}
-                      </StatusPill>
-                    </div>
-                    {asset.detail ? (
-                      <p className="m-0 max-w-[62ch] text-[14.5px] leading-[1.65] text-neutral-800">
-                        {asset.detail}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
   );
 }
 

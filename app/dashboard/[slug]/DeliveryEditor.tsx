@@ -27,7 +27,12 @@ import { saveDeliveryAction, type DeliveryState } from '../actions';
 import { Label, Panel, RowShell, inputClass } from './EditorKit';
 
 /**
- * Studio-side editing for the client's /assets and /status tabs.
+ * Studio-side editing for the delivery records.
+ *
+ * The asset checklist is **internal since 2026-09-07** — the client-facing
+ * "What we need" stage was removed, and the studio asks for what it needs in
+ * the call it makes within 24 hours of acceptance. It stays here because it is
+ * a genuinely useful list to work from; it just is not published any more.
  *
  * The three lists are held in React state and posted as one JSON payload, which
  * the server re-validates row by row — the shapes here are a convenience for
@@ -108,7 +113,7 @@ export function DeliveryEditor({
       <input type="hidden" name="gstPercent" value={rate} />
 
       <Panel
-        title="What we need from the client"
+        title="What we need from the client (internal)"
         hint="Shown on their “What we need” tab. Cut this down to what this project actually needs before you send the link."
         addLabel="Add an item"
         onAdd={() =>
