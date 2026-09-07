@@ -1,5 +1,8 @@
 import {
   byFollowUp,
+  formatInstantIst,
+  parseInstant,
+  toIstLocal,
   cleanFollowUp,
   followUpState,
   formatFollowUp,
@@ -101,6 +104,40 @@ console.log('\n— how it reads on screen —');
     formatFollowUp('2026-09-10T12:00') === 'Thu 10 Sep, 12:00 pm',
     formatFollowUp('2026-09-10T12:00'));
   check('nothing set prints nothing', formatFollowUp(null) === '');
+}
+
+console.log('\n— when the lead actually came in —');
+{
+  // Meta writes the ad account's own zone. This is a real value from the
+  // studio's sheet, and it is the case that makes date-slicing wrong: 15:49 at
+  // -05:00 is twenty past two the NEXT morning in Noida.
+  const meta = '2026-07-31T15:49:34-05:00';
+  check('a Meta timestamp becomes a UTC instant',
+    parseInstant(meta) === '2026-07-31T20:49:34.000Z', parseInstant(meta));
+  check('and reads in IST as the following day',
+    toIstLocal(meta) === '2026-08-01T02:19', toIstLocal(meta));
+  check('which is what the studio sees',
+    formatInstantIst(meta) === 'Sat 1 Aug, 2:19 am', formatInstantIst(meta));
+
+  check('a Z timestamp works too',
+    toIstLocal('2026-09-07T04:00:00Z') === '2026-09-07T09:30',
+    toIstLocal('2026-09-07T04:00:00Z'));
+  check('an offset without a colon is still an offset',
+    parseInstant('2026-07-31T15:49:34-0500') === '2026-07-31T20:49:34.000Z',
+    parseInstant('2026-07-31T15:49:34-0500'));
+
+  // No zone means the studio typed it, in Noida.
+  check('a bare timestamp is read as IST',
+    parseInstant('2026-09-07 10:30:00') === '2026-09-07T05:00:00.000Z',
+    parseInstant('2026-09-07 10:30:00'));
+
+  // Falling back to "now" here is what produced 69 leads all dated the day
+  // they were imported. Null is the honest answer.
+  check('nonsense is null, never today', parseInstant('not a date') === null);
+  check('empty is null', parseInstant('') === null && parseInstant(null) === null);
+  check('a year outside any plausible range is refused',
+    parseInstant('0202-07-31T15:49:34Z') === null);
+  check('nothing to format prints nothing', formatInstantIst(null) === '');
 }
 
 console.log('\n— the call sheet order —');

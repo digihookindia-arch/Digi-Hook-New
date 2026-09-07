@@ -109,6 +109,8 @@ export async function GET(request: NextRequest) {
       summary: summaryFor(lead),
       source: 'sheet',
       externalId: lead.externalId,
+      // Meta's own timestamp, in its ad account's zone. Normalised on the way in.
+      submittedAt: lead.createdAt,
     });
     imported++;
 

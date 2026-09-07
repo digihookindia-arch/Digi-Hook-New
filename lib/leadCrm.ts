@@ -129,6 +129,48 @@ export function formatFollowUp(value: string | null | undefined): string {
 }
 
 /**
+ * An absolute timestamp from somewhere else, as a UTC instant.
+ *
+ * Meta writes its lead times in the ad account's own zone — the studio's sheet
+ * carries `-05:00` — so these are real instants and must be parsed as such,
+ * never string-sliced. A lead submitted at 15:49 New York time is 02:19 the
+ * next morning in Noida, and slicing the date off the front would file it on
+ * the wrong day.
+ *
+ * A value with no zone at all is read as IST, because the only timestamps that
+ * reach this without one are typed by the studio, in Noida. Returns null for
+ * anything unparseable rather than falling back to "now", which would stamp a
+ * lead with the moment we happened to import it — the bug this replaces.
+ */
+export function parseInstant(raw: string | null | undefined): string | null {
+  const value = (raw ?? '').trim();
+  if (!value) return null;
+
+  const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value);
+  const normalised = value.replace(' ', 'T');
+  const parsed = new Date(zoned ? normalised : `${normalised}+05:30`);
+
+  if (Number.isNaN(parsed.getTime())) return null;
+  // A parse that lands outside any plausible range is a misread, not a date.
+  const year = parsed.getUTCFullYear();
+  if (year < 2000 || year > 2100) return null;
+
+  return parsed.toISOString();
+}
+
+/** An instant, as wall-clock time in Noida — the same shape a follow-up uses. */
+export function toIstLocal(raw: string | null | undefined): string | null {
+  const instant = parseInstant(raw);
+  if (!instant) return null;
+  return istNow(new Date(instant));
+}
+
+/** An instant, written out for the studio to read: "Sat 1 Aug, 2:19 am". */
+export function formatInstantIst(raw: string | null | undefined): string {
+  return formatFollowUp(toIstLocal(raw));
+}
+
+/**
  * Sorts leads so the ones needing a call come first: overdue, then today, then
  * scheduled, then everything with no date. Within a group, soonest first.
  *

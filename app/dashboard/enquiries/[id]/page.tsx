@@ -13,6 +13,7 @@ import {
   FOLLOW_UP_LABELS,
   followUpState,
   formatFollowUp,
+  formatInstantIst,
 } from '@/lib/leadCrm';
 import { formatWhatsappNumber } from '@/lib/phone';
 import { SITE_URL } from '@/lib/site';
@@ -23,7 +24,10 @@ import { removeEnquiry, sendMilestoneAction, updateLeadAction } from '../actions
 
 export const dynamic = 'force-dynamic';
 
+// Pinned to Noida. Without a timeZone this renders in the server's zone,
+// which is UTC in production - so an evening note would be filed yesterday.
 const noteTime = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
   day: 'numeric',
   month: 'short',
   hour: 'numeric',
@@ -67,7 +71,7 @@ export default async function EnquiryPage({
             </h1>
             <div className="text-[14.5px] leading-[1.6] text-neutral-800">
               {enquiry.company ? `${enquiry.company} · ` : ''}
-              {enquiry.service} · {new Date(enquiry.createdAt).toLocaleString('en-IN')}
+              {enquiry.service} · Enquired {formatInstantIst(enquiry.submittedAt ?? enquiry.createdAt)}
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
               <span className="border-2 border-neutral-400 px-2.5 py-1 text-[11.5px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">

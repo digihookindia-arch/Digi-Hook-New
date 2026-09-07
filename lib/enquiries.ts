@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { getDb } from './db';
 import type { Answers } from './enquiry';
-import { cleanFollowUp, istNow } from './leadCrm';
+import { cleanFollowUp, istNow, parseInstant } from './leadCrm';
 
 /**
  * Enquiries captured by the public contact form.
@@ -94,6 +94,12 @@ export type Enquiry = {
    * lib/leadCrm.ts. Null means nothing is booked.
    */
   followUpAt: string | null;
+  /**
+   * When the person enquired, as a UTC instant - which is not when we
+   * stored the row. A sheet lead reaches us long after it was submitted.
+   * Null for rows written before this existed; fall back to createdAt.
+   */
+  submittedAt: string | null;
 };
 
 type Row = {
@@ -112,6 +118,7 @@ type Row = {
   external_id: string | null;
   welcomed_at: string | null;
   follow_up_at: string | null;
+  submitted_at: string | null;
 };
 
 function toEnquiry(row: Row): Enquiry {
@@ -142,6 +149,7 @@ function toEnquiry(row: Row): Enquiry {
     externalId: row.external_id,
     welcomedAt: row.welcomed_at,
     followUpAt: row.follow_up_at,
+    submittedAt: row.submitted_at,
   };
 }
 
@@ -157,10 +165,17 @@ export async function saveEnquiry(input: {
   source?: EnquirySource;
   /** The lead-ad row id, when this came from the sheet. */
   externalId?: string | null;
+  /**
+   * When the person actually enquired, in whatever shape the source wrote it —
+   * Meta's carries its ad account's zone. Absent for a form submitted here,
+   * where the row is created the moment they press send.
+   */
+  submittedAt?: string | null;
 }): Promise<Enquiry> {
+  const createdAt = new Date().toISOString();
   const enquiry: Enquiry = {
     id: randomUUID(),
-    createdAt: new Date().toISOString(),
+    createdAt,
     service: input.service,
     name: input.name,
     email: input.email,
@@ -174,14 +189,15 @@ export async function saveEnquiry(input: {
     externalId: input.externalId ?? null,
     welcomedAt: null,
     followUpAt: null,
+    submittedAt: parseInstant(input.submittedAt) ?? createdAt,
   };
 
   getDb()
     .prepare(
       `INSERT INTO enquiries
          (id, created_at, service, name, email, phone, company, answers, summary,
-          status, proposal_slug, source, external_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          status, proposal_slug, source, external_id, submitted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       enquiry.id,
@@ -196,15 +212,24 @@ export async function saveEnquiry(input: {
       enquiry.status,
       enquiry.proposalSlug,
       enquiry.source,
-      enquiry.externalId
+      enquiry.externalId,
+      enquiry.submittedAt
     );
 
   return enquiry;
 }
 
+/**
+ * Newest enquiry first — by when the person wrote to us, not by when we filed
+ * the row. Those are the same thing for the website form and days apart for an
+ * imported lead, and ordering by the wrong one buries a fresh lead underneath
+ * a batch of old ones that happened to import a minute ago.
+ *
+ * COALESCE covers rows written before `submitted_at` existed.
+ */
 export async function listEnquiries(): Promise<Enquiry[]> {
   const rows = getDb()
-    .prepare('SELECT * FROM enquiries ORDER BY created_at DESC')
+    .prepare('SELECT * FROM enquiries ORDER BY COALESCE(submitted_at, created_at) DESC')
     .all() as Row[];
   return rows.map(toEnquiry);
 }

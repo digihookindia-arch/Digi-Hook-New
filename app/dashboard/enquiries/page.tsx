@@ -10,7 +10,13 @@ import {
   type EnquiryStatus,
 } from '@/lib/enquiries';
 import { isDbConfigured } from '@/lib/db';
-import { byFollowUp, followUpState, formatFollowUp, istNow } from '@/lib/leadCrm';
+import {
+  byFollowUp,
+  followUpState,
+  formatFollowUp,
+  formatInstantIst,
+  istNow,
+} from '@/lib/leadCrm';
 import { isEmailConfigured } from '@/lib/email';
 import { isLeadSheetConfigured, isReadingPublicly, leadSheetBlockers } from '@/lib/leadSheet';
 import { requireSession } from '../actions';
@@ -262,8 +268,9 @@ function Row({ enquiry: e, notes }: { enquiry: Enquiry; notes: number }) {
         >
           {ENQUIRY_STATUS_LABELS[e.status]}
         </span>
+        {/* When they enquired, in IST - not when we filed the row. */}
         <span className="text-[13px] leading-none text-neutral-700">
-          {new Date(e.createdAt).toLocaleDateString('en-IN')}
+          {formatInstantIst(e.submittedAt ?? e.createdAt)}
         </span>
         <ArrowRight size={16} aria-hidden="true" />
       </div>

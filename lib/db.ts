@@ -162,7 +162,8 @@ const SCHEMA = `
     source        TEXT NOT NULL DEFAULT 'website',
     external_id   TEXT,
     welcomed_at   TEXT,
-    follow_up_at  TEXT
+    follow_up_at  TEXT,
+    submitted_at  TEXT
   );
   /*
    * enquiries_external is NOT here. It indexes external_id, which is added by
@@ -672,6 +673,11 @@ export function getDb(): DatabaseSync {
     // When to ring this lead next. A naive local datetime - see lib/leadCrm.ts
     // for why it carries no zone. Null means nothing is booked.
     addColumnIfMissing(db, 'enquiries', 'follow_up_at', 'TEXT');
+    // When the person actually enquired, as a UTC instant. Distinct from
+    // created_at, which is when we wrote the row: a lead imported from the
+    // sheet was submitted days or weeks before we saw it, and showing the
+    // import date made 69 leads all look like they arrived the same morning.
+    addColumnIfMissing(db, 'enquiries', 'submitted_at', 'TEXT');
 
     createLateIndexes(db);
     global._dhSqlite = db;
