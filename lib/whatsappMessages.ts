@@ -154,9 +154,14 @@ export function paymentReceivedWhatsapp(input: {
       firstName(input.name),
       formatInr(input.amountInr),
       // The invoice number where one exists, otherwise the proposal's own
-      // reference — both read correctly after the word "Reference", which is
-      // why the template says that rather than "Tax invoice".
-      input.invoiceNumber ?? proposalRef(input.slug),
+      // reference in the studio's house format — both read correctly after the
+      // word "Reference", which is why the template says that and not "Tax
+      // invoice". The prefix is presentation only: this is deliberately NOT an
+      // invoice number, because no invoice was raised. Real ones are issued by
+      // `lib/invoices.ts`, numbered consecutively within the financial year as
+      // Rule 46 requires (DH/26-27/0007), and a proposal reference dressed up
+      // as one would be a number a client's accountant could not reconcile.
+      input.invoiceNumber ?? `DH/${proposalRef(input.slug)}`,
     ],
     media: header('payment-received'),
   };

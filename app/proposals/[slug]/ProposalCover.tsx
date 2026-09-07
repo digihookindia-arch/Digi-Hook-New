@@ -90,8 +90,11 @@ export function ProposalCover({
     paidMilestones(payments)
   );
   const due = totalDue(schedule);
+  // A row worth nothing is not the next thing to pay. Razorpay's floor is one
+  // rupee, so "Next: ₹0" offers something that cannot be collected — the same
+  // guard the payment stage and `totalDue` already apply.
   const nextUp = schedule.find(
-    (row) => row.dueState !== 'paid' && row.payable !== null
+    (row) => row.dueState !== 'paid' && row.payable !== null && row.payable >= 1
   );
 
   return (
