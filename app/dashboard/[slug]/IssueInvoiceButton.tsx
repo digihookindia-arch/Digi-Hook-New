@@ -17,9 +17,15 @@ import { issueInvoiceAction, type IssueInvoiceState } from '../actions';
 export function IssueInvoiceButton({
   slug,
   paymentId,
+  label = 'Issue invoice',
 }: {
   slug: string;
   paymentId: string;
+  /**
+   * Doubles as the send button for an invoice that exists but never reached
+   * anyone — raised while the proposal had no email on file.
+   */
+  label?: string;
 }) {
   const [state, action, pending] = useActionState(
     issueInvoiceAction,
@@ -29,7 +35,7 @@ export function IssueInvoiceButton({
   if (state.issued) {
     return (
       <span className="text-[12.5px] leading-[1.4] text-neutral-800">
-        Issued {state.issued}. Reload to open it.
+        Done — {state.issued}. Reload to see it.
       </span>
     );
   }
@@ -44,7 +50,7 @@ export function IssueInvoiceButton({
         className="inline-flex min-h-[34px] items-center gap-2 border-2 border-neutral-400 px-3 text-[12.5px] font-semibold leading-none text-neutral-800 transition-colors hover:border-text disabled:opacity-45"
       >
         <FileText size={13} aria-hidden="true" />
-        {pending ? 'Issuing…' : 'Issue invoice'}
+        {pending ? 'Working…' : label}
       </button>
       {state.error ? (
         <p

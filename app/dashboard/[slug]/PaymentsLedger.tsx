@@ -160,12 +160,32 @@ export function PaymentsLedger({
                     button issues it retrospectively and emails it. */}
                 <div className="border-l border-neutral-300 px-4 py-4">
                   {invoice ? (
-                    <a
-                      href={`/dashboard/${slug}/invoice/${invoice.id}`}
-                      className="font-heading text-[13px] font-bold leading-[1.35] tracking-[-0.01em] text-accent-700 underline underline-offset-4"
-                    >
-                      {invoice.number}
-                    </a>
+                    <>
+                      <a
+                        href={`/dashboard/${slug}/invoice/${invoice.id}`}
+                        className="font-heading text-[13px] font-bold leading-[1.35] tracking-[-0.01em] text-accent-700 underline underline-offset-4"
+                      >
+                        {invoice.number}
+                      </a>
+                      {/* An invoice raised while there was no address on file
+                          exists but was never sent, and nothing else in the UI
+                          would ever offer to send it. Add the email, press
+                          this. */}
+                      {invoice.emailedAt ? (
+                        <div className="mt-1 text-[12px] leading-[1.4] text-neutral-700">
+                          Emailed{' '}
+                          {new Date(invoice.emailedAt).toLocaleDateString('en-IN')}
+                        </div>
+                      ) : (
+                        <div className="mt-2">
+                          <IssueInvoiceButton
+                            slug={slug}
+                            paymentId={payment.id}
+                            label="Not emailed — send it"
+                          />
+                        </div>
+                      )}
+                    </>
                   ) : payment.status === 'paid' ? (
                     <IssueInvoiceButton slug={slug} paymentId={payment.id} />
                   ) : (
