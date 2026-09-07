@@ -43,6 +43,11 @@ function header(name: HeaderName) {
  *   Hi {{1}}, your proposal from Digi Hook is ready to read.
  *   {{2}}
  *   Access code: {{3}}
+ *
+ *   Any questions, just reply here.
+ *
+ * The closing line is not decoration: Meta rejects a body that ends on a
+ * variable. It is static text, so the parameter count is unchanged.
  */
 export function proposalReadyWhatsapp(input: {
   name: string;
@@ -88,6 +93,11 @@ export function proposalAcceptedWhatsapp(input: {
  *   Hi {{1}}, a payment on your Digi Hook project is now due.
  *   {{2}} — {{3}}
  *   Pay securely: {{4}}
+ *
+ *   Already paid? Ignore this message.
+ *
+ * The closing line keeps the body from ending on a variable, which Meta
+ * rejects, and spares a client who paid an hour ago the worry.
  *
  * `amount` is the GST-inclusive payable figure, because that is what leaves
  * their account. Never the quoted share.
