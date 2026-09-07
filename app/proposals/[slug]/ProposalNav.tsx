@@ -50,7 +50,13 @@ export function ProposalNav({
          becomes the containing block and the bar scrolls away at once. */
       className="sticky top-0 z-30 border-b border-neutral-300 bg-bg/95 backdrop-blur"
     >
-      <div className="mx-auto flex max-w-[900px] list-none flex-wrap items-stretch gap-2 px-gutter py-2.5">
+      {/* Never wraps. Three stages on two lines is the one thing this bar must
+          not do on a phone, so the padding, the gaps and the type are all
+          fluid: they sit at their comfortable maximum on a desktop and shrink
+          to fit rather than pushing "03 Payment" onto a second row. Measured
+          down to a 320px viewport, where the row still lands inside the
+          gutters. No breakpoint anywhere. */}
+      <div className="mx-auto flex max-w-[900px] flex-nowrap items-stretch gap-[clamp(2px,1.2vw,8px)] px-gutter py-2.5">
         {STAGES.map((stage, i) => {
           const href = `${base}${stage.path}`;
           const number = String(i + 1).padStart(2, '0');
@@ -64,7 +70,7 @@ export function ProposalNav({
             <>
               <span
                 aria-hidden="true"
-                className={`font-heading text-[11px] font-extrabold leading-none tracking-[0.04em] ${
+                className={`font-heading text-[clamp(10px,2.6vw,11px)] font-extrabold leading-none tracking-[0.04em] ${
                   active
                     ? 'text-accent-400'
                     : locked
@@ -74,7 +80,7 @@ export function ProposalNav({
               >
                 {number}
               </span>
-              <span className="text-[14.5px] font-semibold leading-none">
+              <span className="whitespace-nowrap text-[clamp(12.5px,3.3vw,14.5px)] font-semibold leading-none">
                 {stage.label}
               </span>
               {locked ? (
@@ -95,7 +101,7 @@ export function ProposalNav({
               key={href}
               aria-disabled="true"
               title="Opens once you accept the proposal"
-              className="inline-flex min-h-[44px] cursor-not-allowed items-center gap-2.5 rounded-panel-sm px-4 text-neutral-500"
+              className="inline-flex min-h-[44px] flex-none cursor-not-allowed items-center gap-[clamp(4px,1.4vw,10px)] rounded-panel-sm px-[clamp(9px,2.6vw,16px)] text-neutral-500"
             >
               {inner}
             </span>
@@ -104,7 +110,7 @@ export function ProposalNav({
               key={href}
               href={href}
               aria-current={active ? 'page' : undefined}
-              className={`inline-flex min-h-[44px] items-center gap-2.5 rounded-panel-sm px-4 transition-colors ${
+              className={`inline-flex min-h-[44px] flex-none items-center gap-[clamp(4px,1.4vw,10px)] rounded-panel-sm px-[clamp(9px,2.6vw,16px)] transition-colors ${
                 active
                   ? 'bg-text text-bg shadow-panel'
                   : 'text-neutral-800 hover:bg-panel hover:shadow-panel'
