@@ -126,14 +126,24 @@ export type TaxSplit =
  * so the second half absorbs any odd rupee rather than each being rounded
  * independently — otherwise a ₹7,081 invoice whose parts sum to ₹7,080 goes
  * back and forth with somebody's accountant.
+ *
+ * `chargedGst` is the tax that was actually taken, and when it is supplied it
+ * is what gets split. It must be, because it can legitimately differ by a
+ * rupee from the tax on this row computed alone: `gstShares` reconciles
+ * rounding across the whole schedule so the client's column adds up, which can
+ * push an odd rupee onto the last row. Recomputing here would then produce
+ * tax lines that disagree with the total charged — a tax invoice whose parts do
+ * not sum to its own total, which is the one thing an invoice must never be.
  */
 export function taxSplit(input: {
   taxableValue: number;
   gstPercent: number;
   supplierStateCode: string;
   placeOfSupplyCode: string;
+  /** The tax actually charged. Omitted only where no payment exists yet. */
+  chargedGst?: number;
 }): TaxSplit {
-  const whole = gstOn(input.taxableValue, input.gstPercent).gst;
+  const whole = input.chargedGst ?? gstOn(input.taxableValue, input.gstPercent).gst;
 
   if (input.supplierStateCode === input.placeOfSupplyCode) {
     const half = input.gstPercent / 2;

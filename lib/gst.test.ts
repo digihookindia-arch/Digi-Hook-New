@@ -170,5 +170,47 @@ console.log('\nparseBilling');
     !clash.ok ? clash.error : '');
 }
 
+console.log('\nan invoice must balance against what was charged');
+{
+  // The bug this pins: gstShares reconciles rounding across a schedule, so a
+  // row's charged tax can differ by a rupee from the tax on that row alone.
+  // Splitting a recomputed figure produced tax lines that did not sum to the
+  // invoice total - taxable 2 + CGST 0 + SGST 0 against a total of 3.
+  const intra = taxSplit({
+    taxableValue: 2, gstPercent: 18,
+    supplierStateCode: '09', placeOfSupplyCode: '09',
+    chargedGst: 1,
+  });
+  check('the charged tax is what gets split', intra.total === 1, intra);
+  check('  and the halves sum to it exactly',
+    intra.cgst + intra.sgst === 1, { cgst: intra.cgst, sgst: intra.sgst });
+  check('  so taxable + tax equals the charged total',
+    2 + intra.cgst + intra.sgst === 3);
+
+  const inter = taxSplit({
+    taxableValue: 2, gstPercent: 18,
+    supplierStateCode: '09', placeOfSupplyCode: '27',
+    chargedGst: 1,
+  });
+  check('inter-state carries the charged tax as IGST', inter.igst === 1);
+
+  // Without a charged figure it still computes its own, as before.
+  const alone = taxSplit({
+    taxableValue: 10000, gstPercent: 18,
+    supplierStateCode: '09', placeOfSupplyCode: '09',
+  });
+  check('with no charged tax it computes one', alone.total === 1800);
+  check('  and still splits it evenly', alone.cgst === 900 && alone.sgst === 900);
+
+  // An odd rupee must land on one half, never be lost.
+  const odd = taxSplit({
+    taxableValue: 7, gstPercent: 18,
+    supplierStateCode: '09', placeOfSupplyCode: '09',
+    chargedGst: 7,
+  });
+  check('an odd charged tax still sums exactly',
+    odd.cgst + odd.sgst === 7, { cgst: odd.cgst, sgst: odd.sgst });
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

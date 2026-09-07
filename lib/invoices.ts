@@ -190,6 +190,10 @@ export async function issueInvoice(
     gstPercent: payment.gstPercent,
     supplierStateCode: site.gstStateCode,
     placeOfSupplyCode: placeOfSupply,
+    // The tax the client was actually charged, not a fresh calculation of it.
+    // The two can differ by a rupee once the schedule has reconciled its own
+    // rounding, and an invoice must balance against what was taken.
+    chargedGst: payment.gstInr,
   });
 
   const db = getDb();
