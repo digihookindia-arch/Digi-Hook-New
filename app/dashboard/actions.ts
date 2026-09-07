@@ -17,6 +17,7 @@ import {
   newAccessCode,
   newSlug,
   saveDelivery,
+  markMilestonePaid,
   saveProposal,
   setAssetsShared,
   setProposalAccepted,
@@ -25,6 +26,7 @@ import {
   type Proposal,
 } from '@/lib/proposals';
 import {
+  milestoneSchedule,
   parseAssets,
   parseMilestones,
   parseStages,
@@ -40,7 +42,13 @@ import {
 import { renderInvoicePdf } from '@/lib/invoicePdf';
 import { DEFAULT_GST_PERCENT, cleanGstPercent } from '@/lib/money';
 import { invoiceIssuedEmail } from '@/lib/paymentEmails';
-import { listPayments } from '@/lib/payments';
+import {
+  listPayments,
+  paidMilestones,
+  paymentReference,
+  recordOfflinePayment,
+} from '@/lib/payments';
+import { deliverPaymentConfirmation } from '@/lib/paymentFlow';
 import { parseProposalContent } from '@/lib/proposalContent';
 import { draftProposal, reviseProposal } from '@/lib/claude';
 
@@ -459,4 +467,84 @@ export async function issueInvoiceAction(
   revalidatePath(`/dashboard/${slug}`);
   revalidatePath(`/proposals/${slug}/payment`);
   return { issued: invoice.number };
+}
+
+export type OfflinePaymentState = { error?: string; recorded?: string };
+
+/**
+ * Records a payment that arrived in the bank rather than through the site, and
+ * raises its tax invoice.
+ *
+ * Most clients pay by NEFT or UPI, so this is the ordinary path to an invoice,
+ * not a fallback. It deliberately reuses everything the gateway uses: the same
+ * payments row, the same numbering, the same PDF, the same emails. Only the
+ * `method` differs, which the studio types so a bank statement reconciles
+ * against a row here.
+ *
+ * The amount is never taken from the form. It is derived from the proposal's
+ * own schedule for the milestone being settled, exactly as `startPayment`
+ * does — a figure typed twice is a figure that will eventually disagree with
+ * itself, and this one ends up on a tax invoice.
+ */
+export async function recordOfflinePaymentAction(
+  _prev: OfflinePaymentState,
+  formData: FormData
+): Promise<OfflinePaymentState> {
+  await requireSession();
+
+  const slug = String(formData.get('slug') ?? '');
+  const index = Number(formData.get('milestoneIndex'));
+  const method = String(formData.get('method') ?? '').trim();
+  const paidOn = String(formData.get('paidOn') ?? '').trim();
+
+  const proposal = await getProposal(slug);
+  if (!proposal) return { error: 'That proposal no longer exists.' };
+  if (!Number.isInteger(index)) return { error: 'Choose which payment this settles.' };
+  if (!method) return { error: 'Say how it was paid — bank transfer, UPI, cheque.' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn)) {
+    return { error: 'Give the date the money arrived, as YYYY-MM-DD.' };
+  }
+
+  const existing = await listPayments(slug);
+  if (paidMilestones(existing).has(index)) {
+    return { error: 'That payment is already recorded as received.' };
+  }
+
+  const row = milestoneSchedule(
+    proposal.content.total,
+    proposal.milestones,
+    proposal.gstPercent,
+    paidMilestones(existing)
+  )[index];
+  if (!row) return { error: 'That payment is not on the schedule.' };
+  if (row.subtotal === null || row.gst === null || row.payable === null) {
+    return {
+      error:
+        'That row has no rupee figure — the proposal total is a range. Set an exact amount on the milestone first.',
+    };
+  }
+
+  const payment = await recordOfflinePayment({
+    proposalSlug: slug,
+    milestoneIndexes: [index],
+    milestoneLabel: row.milestone.label,
+    subtotalInr: row.subtotal,
+    gstPercent: proposal.gstPercent,
+    gstInr: row.gst,
+    amountInr: row.payable,
+    receipt: paymentReference(slug, index),
+    method,
+    // Stored as the day it arrived, at midday, so a date with no time cannot
+    // drift across a day boundary when it is later formatted.
+    paidAt: new Date(`${paidOn}T12:00:00.000Z`).toISOString(),
+  });
+
+  await markMilestonePaid(slug, index);
+
+  // Same settlement path as the gateway: invoice, PDF, emails, WhatsApp.
+  await deliverPaymentConfirmation(proposal, payment);
+
+  revalidatePath(`/dashboard/${slug}`);
+  revalidatePath(`/proposals/${slug}/payment`);
+  return { recorded: payment.receipt };
 }

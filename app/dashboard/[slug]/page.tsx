@@ -4,9 +4,11 @@ import { ArrowLeft, ChevronRight, Trash2, ExternalLink } from 'lucide-react';
 import { getProposalJourney } from '@/lib/journey';
 import { isEmailConfigured } from '@/lib/email';
 import { listInvoices } from '@/lib/invoices';
-import { listPayments } from '@/lib/payments';
+import { listPayments, paidMilestones } from '@/lib/payments';
+import { milestoneSchedule } from '@/lib/delivery';
 import { isRazorpayConfigured, isWebhookConfigured } from '@/lib/razorpay';
 import { BillingForm } from './BillingForm';
+import { OfflinePaymentForm } from './OfflinePaymentForm';
 import { PaymentsLedger } from './PaymentsLedger';
 import { ProposalView } from '@/components/ProposalView';
 import { ClientUpdates } from '@/components/ClientUpdates';
@@ -37,6 +39,13 @@ export default async function EditProposalPage({
   if (!journey?.proposal) notFound();
   const { proposal } = journey;
   const payments = await listPayments(slug);
+  // Rows a bank payment could settle: unpaid, and with a real rupee figure.
+  const settleable = milestoneSchedule(
+    proposal.content.total,
+    proposal.milestones,
+    proposal.gstPercent,
+    paidMilestones(payments)
+  ).filter((row) => row.dueState !== 'paid' && row.payable !== null && row.payable >= 1);
   const invoices = await listInvoices(slug);
 
   return (
@@ -264,6 +273,12 @@ export default async function EditProposalPage({
           <div className="mb-7">
             <BillingForm proposal={proposal} />
           </div>
+          {proposal.acceptedAt ? (
+            <div className="mb-7">
+              <OfflinePaymentForm slug={proposal.slug} rows={settleable} />
+            </div>
+          ) : null}
+
           <PaymentsLedger
             slug={proposal.slug}
             payments={payments}

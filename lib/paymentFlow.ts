@@ -16,7 +16,7 @@ import {
   markPaymentPaid,
   type Payment,
 } from './payments';
-import { getProposal, markMilestonePaid } from './proposals';
+import { getProposal, markMilestonePaid, type Proposal } from './proposals';
 import { fetchPayment } from './razorpay';
 import { sendWhatsapp } from './whatsapp';
 import { paymentReceivedWhatsapp } from './whatsappMessages';
@@ -119,9 +119,16 @@ export async function settlePayment(input: {
  * field is filled in — `issueInvoice` is keyed on the payment, so it numbers
  * it then rather than never.
  */
-async function notify(payment: Payment): Promise<void> {
+export async function deliverPaymentConfirmation(
+  proposal: Proposal,
+  payment: Payment
+): Promise<void> {
+  return notify(payment, proposal);
+}
+
+async function notify(payment: Payment, known?: Proposal): Promise<void> {
   try {
-    const proposal = await getProposal(payment.proposalSlug);
+    const proposal = known ?? (await getProposal(payment.proposalSlug));
     if (!proposal) return;
 
     // Invoices go to the accounts inbox when the client named one; everything

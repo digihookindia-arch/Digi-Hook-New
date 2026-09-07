@@ -237,3 +237,92 @@ export function collectedInr(payments: Payment[]): number {
     .filter((p) => p.status === 'paid')
     .reduce((sum, p) => sum + p.amountInr, 0);
 }
+
+/**
+ * Records a payment that arrived outside the website — a bank transfer, a UPI
+ * push to the current account, a cheque.
+ *
+ * Most Indian B2B clients pay this way, so this is the ordinary case rather
+ * than the exception, and the studio still owes them a tax invoice for it.
+ * Rather than a second path to invoicing, it writes the same row the checkout
+ * writes and marks it settled immediately: everything downstream — the invoice,
+ * its number, the PDF, the emails, the client's receipts list — then works
+ * without knowing how the money arrived.
+ *
+ * The one visible difference is `method`, which the studio types, so a bank
+ * statement can be reconciled against a row here.
+ *
+ * `orderId` is synthesised because the column is NOT NULL UNIQUE and there is
+ * no gateway order behind this. The `offline_` prefix makes it obvious in the
+ * ledger that no gateway was involved, and keeps it from ever colliding with a
+ * Razorpay id.
+ */
+export async function recordOfflinePayment(input: {
+  proposalSlug: string;
+  milestoneIndexes: number[];
+  milestoneLabel: string;
+  subtotalInr: number;
+  gstPercent: number;
+  gstInr: number;
+  amountInr: number;
+  receipt: string;
+  /** "Bank transfer", "UPI", "Cheque 004123" — the studio's own words. */
+  method: string;
+  /** When the money actually arrived, which is rarely when it is recorded. */
+  paidAt: string;
+}): Promise<Payment> {
+  const first = input.milestoneIndexes[0];
+  if (first === undefined) throw new Error('A payment must settle a milestone.');
+
+  const payment: Payment = {
+    id: randomUUID(),
+    proposalSlug: input.proposalSlug,
+    milestoneIndex: first,
+    milestoneIndexes: input.milestoneIndexes,
+    milestoneLabel: input.milestoneLabel,
+    subtotalInr: input.subtotalInr,
+    gstPercent: input.gstPercent,
+    gstInr: input.gstInr,
+    amountInr: input.amountInr,
+    orderId: `offline_${randomUUID()}`,
+    paymentId: null,
+    method: input.method.trim().slice(0, 60) || 'Bank transfer',
+    status: 'paid',
+    failureReason: '',
+    receipt: input.receipt,
+    createdAt: new Date().toISOString(),
+    paidAt: input.paidAt,
+  };
+
+  getDb()
+    .prepare(
+      `INSERT INTO payments
+         (id, proposal_slug, milestone_index, milestone_indexes, milestone_label,
+          subtotal_inr, gst_percent, gst_inr, amount_inr, order_id, payment_id,
+          method, status, receipt, created_at, paid_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'paid', ?, ?, ?)`
+    )
+    .run(
+      payment.id,
+      payment.proposalSlug,
+      payment.milestoneIndex,
+      JSON.stringify(payment.milestoneIndexes),
+      payment.milestoneLabel,
+      payment.subtotalInr,
+      payment.gstPercent,
+      payment.gstInr,
+      payment.amountInr,
+      payment.orderId,
+      payment.method,
+      payment.receipt,
+      payment.createdAt,
+      payment.paidAt
+    );
+
+  return payment;
+}
+
+/** True when this payment did not come through the gateway. */
+export function isOffline(payment: Payment): boolean {
+  return payment.orderId.startsWith('offline_');
+}
