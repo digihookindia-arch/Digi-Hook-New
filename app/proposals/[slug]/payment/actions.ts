@@ -183,10 +183,15 @@ export async function startPayment(input: {
     amountPaise: order.amount,
     receipt,
     description: `${label} — ${site.name} (ref ${proposalRef(slug)})`.slice(0, 255),
+    // Whatever we already know, so the checkout opens on the payment methods
+    // rather than on a form the client has already filled in for us. Razorpay
+    // asks for anything left blank, so an empty field here is a screen the
+    // client should not have had to see — the dashboard flags proposals that
+    // are payable without these.
     prefill: {
-      name: proposal.client,
-      email: proposal.clientEmail,
-      contact: proposal.clientPhone,
+      name: proposal.clientLegalName.trim() || proposal.client,
+      email: proposal.clientEmail.trim() || proposal.invoiceEmail.trim(),
+      contact: proposal.clientPhone.trim(),
     },
   };
 }

@@ -44,17 +44,40 @@ export function PaymentsLedger({
   invoices,
   gatewayLive,
   webhookLive,
+  contact,
 }: {
   slug: string;
   payments: Payment[];
   invoices: Invoice[];
   gatewayLive: boolean;
   webhookLive: boolean;
+  /**
+   * What the checkout can prefill. Blank fields are screens the client has to
+   * fill in themselves at the worst possible moment - mid-payment - so the
+   * gap is worth saying out loud here rather than discovering it from a
+   * client's complaint.
+   */
+  contact: { email: string; phone: string; payable: boolean };
 }) {
   const received = collectedInr(payments);
 
+  const missing = [
+    contact.email ? null : 'email address',
+    contact.phone ? null : 'phone number',
+  ].filter(Boolean) as string[];
+
   return (
     <div>
+      {contact.payable && missing.length > 0 ? (
+        <Notice>
+          No {missing.join(' or ')} on file for this client. Razorpay prefills the
+          checkout from the proposal, so they will be asked to type{' '}
+          {missing.length === 1 ? 'it' : 'them'} in mid-payment — and the receipt
+          has nowhere to go. Add {missing.length === 1 ? 'it' : 'them'} in the
+          contact panel above.
+        </Notice>
+      ) : null}
+
       {!gatewayLive ? (
         <Notice>
           Razorpay is not configured — set RAZORPAY_KEY_ID and

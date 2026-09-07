@@ -328,6 +328,11 @@ export default async function EditProposalPage({
             slug={proposal.slug}
             payments={payments}
             invoices={invoices}
+            contact={{
+              email: proposal.clientEmail || proposal.invoiceEmail,
+              phone: proposal.clientPhone,
+              payable: Boolean(proposal.acceptedAt) && proposal.milestones.length > 0,
+            }}
             gatewayLive={isRazorpayConfigured()}
             webhookLive={isWebhookConfigured()}
           />
