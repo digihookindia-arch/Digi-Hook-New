@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Check, Lock } from 'lucide-react';
+import { ArrowRight, Check, Lock, X } from 'lucide-react';
 
 /**
  * The three stages of the engagement, as a bar that stays at the top of the
@@ -17,10 +18,16 @@ import { Check, Lock } from 'lucide-react';
  * explain it is a stage that will be skipped, and the page underneath says
  * everything the old descriptions did.
  *
- * Until the proposal is accepted, Status and Payment render greyed and
- * non-navigable — there is nothing to track or bill against a project nobody
- * has agreed to. Every sub-page re-checks acceptance server-side, so this is
- * presentation, not the gate.
+ * Until the proposal is accepted, Status and Payment render greyed — there is
+ * nothing to track or bill against a project nobody has agreed to. Every
+ * sub-page re-checks acceptance server-side, so this is presentation, not the
+ * gate.
+ *
+ * A greyed stage still answers when pressed. It used to carry only a `title`,
+ * which is a hover tooltip: invisible on every phone, and silent on a click
+ * anywhere. Pressing a locked stage therefore did nothing at all, which reads
+ * as a broken link rather than a closed door. It now explains itself and offers
+ * the one action that opens it.
  */
 
 type Stage = { label: string; path: string; gated: boolean };
@@ -40,6 +47,8 @@ export function ProposalNav({
 }) {
   const base = `/proposals/${slug}`;
   const pathname = usePathname();
+  // Which locked stage was last pressed, so the notice can name it.
+  const [blocked, setBlocked] = useState<string | null>(null);
 
   return (
     <nav
@@ -97,14 +106,18 @@ export function ProposalNav({
           );
 
           return locked ? (
-            <span
+            <button
               key={href}
-              aria-disabled="true"
-              title="Opens once you accept the proposal"
-              className="inline-flex min-h-[44px] flex-none cursor-not-allowed items-center gap-[clamp(4px,1.4vw,10px)] rounded-panel-sm px-[clamp(9px,2.6vw,16px)] text-neutral-500"
+              type="button"
+              onClick={() => setBlocked(stage.label)}
+              aria-expanded={blocked === stage.label}
+              className="inline-flex min-h-[44px] flex-none items-center gap-[clamp(4px,1.4vw,10px)] rounded-panel-sm px-[clamp(9px,2.6vw,16px)] text-neutral-500 transition-colors hover:text-neutral-800"
             >
               {inner}
-            </span>
+              <span className="sr-only">
+                — not yet available. Select to find out why.
+              </span>
+            </button>
           ) : (
             <Link
               key={href}
@@ -121,6 +134,44 @@ export function ProposalNav({
           );
         })}
       </div>
+
+      {/* Announced rather than merely drawn, so a screen reader hears the
+          explanation the sighted user just triggered. */}
+      {blocked ? (
+        <div
+          role="status"
+          className="border-t border-neutral-300 bg-accent-100"
+        >
+          <div className="mx-auto flex max-w-[900px] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-gutter py-3.5">
+            <p className="m-0 max-w-[62ch] text-[13.5px] leading-[1.6] text-accent-800">
+              <strong className="font-semibold">
+                {blocked} opens once the proposal is accepted.
+              </strong>{' '}
+              Accepting costs nothing and commits you to no payment today — each
+              one is invoiced when it falls due. It opens this stage and the
+              rest of your project record.
+            </p>
+            <div className="flex flex-none items-center gap-3">
+              <Link
+                href={`${base}#accept`}
+                onClick={() => setBlocked(null)}
+                className="inline-flex min-h-[40px] items-center gap-2 rounded-panel-sm bg-accent-600 px-4 text-[13.5px] font-semibold leading-none text-white transition-colors hover:bg-accent-700"
+              >
+                Review and accept
+                <ArrowRight size={14} strokeWidth={2.5} aria-hidden="true" />
+              </Link>
+              <button
+                type="button"
+                onClick={() => setBlocked(null)}
+                aria-label="Dismiss"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-panel-sm text-accent-800 transition-colors hover:bg-accent-200"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </nav>
   );
 }
