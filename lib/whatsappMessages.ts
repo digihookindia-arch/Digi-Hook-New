@@ -126,8 +126,14 @@ export function paymentDueWhatsapp(input: {
 /**
  * 4 · Payment received
  *
- *   Hi {{1}}, we have received your payment of {{2}}. Tax invoice {{3}} is on
- *   its way to your email.
+ *   Hi {{1}}, we have received your payment of {{2}}. Reference {{3}}.
+ *   Your invoice follows by email.
+ *
+ * "Reference", not "Tax invoice", because a tax invoice is not always what
+ * follows. When the studio GSTIN or the client's state is missing, the client
+ * gets a plain receipt instead — and a message promising an invoice that never
+ * arrives is the one kind of automated message worth not sending at all. One
+ * neutral word covers both, so there is no second template to keep in step.
  *
  * The invoice PDF is not attached. AiSensy media needs a publicly reachable
  * URL, and a tax invoice carrying a client's name, address and GSTIN must not
@@ -147,9 +153,10 @@ export function paymentReceivedWhatsapp(input: {
     params: [
       firstName(input.name),
       formatInr(input.amountInr),
-      // A payment that could not be invoiced yet still deserves a confirmation;
-      // it names the proposal instead of a number that does not exist.
-      input.invoiceNumber ?? `for proposal ${proposalRef(input.slug)}`,
+      // The invoice number where one exists, otherwise the proposal's own
+      // reference — both read correctly after the word "Reference", which is
+      // why the template says that rather than "Tax invoice".
+      input.invoiceNumber ?? proposalRef(input.slug),
     ],
     media: header('payment-received'),
   };

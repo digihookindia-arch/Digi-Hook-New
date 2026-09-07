@@ -118,8 +118,8 @@ console.log('\n— template parameters are positional, so pin the order —');
     invoiceNumber: null,
     slug: '7d34593e-0000-4000-8000-000000000001',
   });
-  check('  an uninvoiced payment still names the proposal',
-    noInvoice.params[2]?.includes('7D34593E') === true, noInvoice.params[2]);
+  check('  an uninvoiced payment falls back to the proposal reference',
+    noInvoice.params[2] === '7D34593E', noInvoice.params[2]);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
