@@ -212,14 +212,19 @@ export const work: WorkItem[] = [
       'Built once and served as finished files — nothing is assembled while a visitor waits.',
   },
   /*
-   * The three entries below were first measured with the local Lighthouse CLI,
-   * because keyless PageSpeed Insights shares one anonymous quota with the
-   * whole internet and was returning 429 all day. They were re-measured through
-   * PSI on 2026-09-07 with the key in the server's .env.local, and every one came
-   * out higher than the local run — Google runs Lighthouse on its own hardware,
-   * not on a laptop with a dev server beside it. That gap is the whole reason
-   * `source` is printed beside each score instead of being left to the reader
-   * to assume. Measure through PSI from here on; the studio has a key.
+   * Measured through PageSpeed Insights on 2026-09-07, on mobile, with the key
+   * in the server's .env.local. Two earlier passes were thrown away and both
+   * failures are worth knowing about:
+   *
+   *  1. Keyless PSI shares one anonymous quota with the whole internet and
+   *     429s, so the first pass fell back to the local Lighthouse CLI — which
+   *     read five to fourteen points lower on the same pages. Google runs
+   *     Lighthouse on its own hardware; a laptop is not that. Hence `source`.
+   *  2. The second pass ran while this VPS was building and restarting a
+   *     deploy. **These sites share the box with digihook.in**, so a reading
+   *     taken mid-deploy measures the deploy, not the site: ramdelotraders
+   *     came back 80 under load and 91 on an idle server. Never measure a
+   *     client site during a deploy, and re-run anything that looks off.
    */
   {
     id: 'apnaheaven',
@@ -233,7 +238,7 @@ export const work: WorkItem[] = [
     shot: '/work/apnaheaven.webp',
     shotAlt:
       'Home page of apnaheaven.com — a dusk photograph of curved high-rise towers behind trees, with the heading “Apna Heaven” above buttons reading Explore Properties and Book a Consultation.',
-    scores: { performance: 91, accessibility: 95, bestPractices: 100, seo: 100 },
+    scores: { performance: 98, accessibility: 95, bestPractices: 100, seo: 100 },
     measured: '2026-09-07',
     strategy: 'mobile',
     source: 'PageSpeed Insights',
@@ -254,11 +259,10 @@ export const work: WorkItem[] = [
     shot: '/work/ramdelotraders.webp',
     shotAlt:
       'Home page of ramdelotraders.com — a cream hero reading “Pure Ingredients, Authentic Teas” beside a photograph of a Bablu Channa tea pouch in an arched frame.',
-    // Performance is the lowest number on this page, and it is published as
-    // measured. The catalogue home carries a lot of product photography above
-    // the fold; 80 is a fact about the page as it stands today, not a figure to
-    // round up. Re-measure after any image work rather than editing it here.
-    scores: { performance: 80, accessibility: 98, bestPractices: 100, seo: 100 },
+    // The heaviest page on this list — the catalogue home carries a lot of
+    // product photography above the fold, and its LCP is the slowest of the six.
+    // Re-measure after any image work rather than editing the figure here.
+    scores: { performance: 91, accessibility: 98, bestPractices: 100, seo: 100 },
     measured: '2026-09-07',
     strategy: 'mobile',
     source: 'PageSpeed Insights',
@@ -279,7 +283,7 @@ export const work: WorkItem[] = [
     shot: '/work/therosadori.webp',
     shotAlt:
       'Home page of therosadori.com — a photograph of jute and cotton bags arranged on a terrace table above a lake, under the Rosa Dori wordmark.',
-    scores: { performance: 94, accessibility: 91, bestPractices: 96, seo: 100 },
+    scores: { performance: 98, accessibility: 91, bestPractices: 100, seo: 100 },
     measured: '2026-09-07',
     strategy: 'mobile',
     source: 'PageSpeed Insights',
