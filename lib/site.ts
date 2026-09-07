@@ -116,6 +116,26 @@ export const site = {
    */
   sacCode: '998314',
 
+  /**
+   * Where each financial year's invoice series starts.
+   *
+   * Rule 46 requires the number to be *consecutive* within the year; it does
+   * not require the year to start at 1, and a business may open its series
+   * wherever it likes so long as it counts up from there. Set above 1 so a
+   * client's first invoice is not visibly the studio's first invoice.
+   *
+   * Two things to keep straight if this ever changes. It may only ever move
+   * **up**, and only between financial years — lowering it mid-year, or
+   * dropping it below numbers already issued, would repeat a number and break
+   * the one property the rule exists to guarantee. And the studio's own books
+   * must open at the same figure, or the accounts and the invoices disagree.
+   *
+   * TODO(client): confirm the opening number with the CA before the first live
+   * invoice. It is a presentational choice, not a compliance one, but it is
+   * theirs to make and it cannot be walked back once an invoice carries it.
+   */
+  invoiceSequenceStart: 1,
+
   builtWith: 'Engineered in Next.js, TypeScript and Tailwind CSS.',
 } as const;
 

@@ -198,7 +198,12 @@ export async function issueInvoice(
     const last = db
       .prepare('SELECT MAX(sequence) AS top FROM invoices WHERE financial_year = ?')
       .get(fy) as { top: number | null } | undefined;
-    const sequence = (last?.top ?? 0) + 1;
+    // Opens the year at `invoiceSequenceStart` and counts up from there.
+    // Never below what has already been issued: a repeated number is the one
+    // failure the consecutive-series rule exists to prevent, so the stored
+    // maximum always wins over a start that was later set too low.
+    const floor = Math.max(last?.top ?? 0, site.invoiceSequenceStart - 1);
+    const sequence = floor + 1;
 
     const invoice: Invoice = {
       id: randomUUID(),
