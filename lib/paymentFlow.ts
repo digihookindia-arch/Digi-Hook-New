@@ -18,6 +18,8 @@ import {
 } from './payments';
 import { getProposal, markMilestonePaid } from './proposals';
 import { fetchPayment } from './razorpay';
+import { sendWhatsapp } from './whatsapp';
+import { paymentReceivedWhatsapp } from './whatsappMessages';
 
 /**
  * Settling a payment: the one code path that decides money has arrived.
@@ -127,6 +129,19 @@ async function notify(payment: Payment): Promise<void> {
     const invoiceTo = proposal.invoiceEmail.trim() || proposal.clientEmail;
 
     const issued = await issueInvoice(proposal, payment);
+
+    // Sent whether or not an invoice could be raised: a client who has just
+    // been charged wants to know it landed, and "your invoice is delayed" is
+    // a different conversation from "did my money arrive".
+    await sendWhatsapp(
+      paymentReceivedWhatsapp({
+        name: proposal.client,
+        phone: proposal.clientPhone,
+        amountInr: payment.amountInr,
+        invoiceNumber: issued.ok ? issued.invoice.number : null,
+        slug: proposal.slug,
+      })
+    );
 
     if (issued.ok) {
       const { invoice } = issued;

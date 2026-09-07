@@ -12,6 +12,8 @@ import { getJourney, getProposalJourney, milestoneMailFor } from '@/lib/journey'
 import { setProposalContact } from '@/lib/proposals';
 import { sendMilestone } from '@/lib/sentEmails';
 import { STUDIO_INBOX } from '@/lib/email';
+import { sendWhatsapp } from '@/lib/whatsapp';
+import { proposalReadyWhatsapp } from '@/lib/whatsappMessages';
 import { requireSession } from '../actions';
 
 /** Every action re-checks the session — middleware only proves a cookie exists. */
@@ -74,6 +76,20 @@ export async function sendMilestoneAction(formData: FormData): Promise<void> {
     },
     replyTo: STUDIO_INBOX,
   });
+
+  // Stage 3 is "your proposal is ready", the one message most likely to sit
+  // unread in an inbox — so it also goes to WhatsApp. Only stage 3: the others
+  // are conversation, and a template cannot hold a conversation.
+  if (row.stage === 3 && journey.proposal) {
+    await sendWhatsapp(
+      proposalReadyWhatsapp({
+        name: journey.proposal.client,
+        phone: journey.proposal.clientPhone,
+        slug: journey.proposal.slug,
+        accessCode: journey.proposal.accessCode,
+      })
+    );
+  }
 
   // Only a delivered email may move the pipeline. A failed send that advanced
   // the status would leave the dashboard claiming the client knows something

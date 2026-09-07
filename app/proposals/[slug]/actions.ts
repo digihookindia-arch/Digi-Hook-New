@@ -10,6 +10,8 @@ import { formatInr } from '@/lib/money';
 import { parseAmount } from '@/lib/delivery';
 import { proposalRef } from '@/lib/proposalDoc';
 import { SITE_URL } from '@/lib/site';
+import { sendWhatsapp } from '@/lib/whatsapp';
+import { proposalAcceptedWhatsapp } from '@/lib/whatsappMessages';
 
 /**
  * Access-code gate for a published proposal. Verified server-side; on success a
@@ -120,6 +122,12 @@ async function notifyAccepted(proposal: Awaited<ReturnType<typeof getProposal>>)
   } catch (e) {
     console.error('[proposals] studio acceptance alert failed', proposal.slug, e);
   }
+
+  // WhatsApp before email, because it is the one they will actually see, and
+  // both are independent: a missing phone must not cost them the email.
+  await sendWhatsapp(
+    proposalAcceptedWhatsapp({ name: proposal.client, phone: proposal.clientPhone })
+  );
 
   if (!proposal.clientEmail) return;
   try {

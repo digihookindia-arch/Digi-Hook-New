@@ -1,6 +1,7 @@
 import { collectedInr, type Payment } from '@/lib/payments';
 import type { Invoice } from '@/lib/invoices';
 import { formatInr } from '@/lib/money';
+import { isReachable } from '@/lib/phone';
 import { IssueInvoiceButton } from './IssueInvoiceButton';
 
 /**
@@ -66,8 +67,22 @@ export function PaymentsLedger({
     contact.phone ? null : 'phone number',
   ].filter(Boolean) as string[];
 
+  // Checked with the sender's own rule, not just for emptiness: a number that
+  // is present but unusable looks filled in on the page and silently reaches
+  // nobody.
+  const unreachable = Boolean(contact.phone) && !isReachable(contact.phone);
+
   return (
     <div>
+      {unreachable ? (
+        <Notice>
+          The phone number on file is not one WhatsApp can reach, so payment and
+          acceptance messages are being skipped for this client. It needs a
+          country code or a full ten-digit mobile — fix it in the contact panel
+          above.
+        </Notice>
+      ) : null}
+
       {contact.payable && missing.length > 0 ? (
         <Notice>
           No {missing.join(' or ')} on file for this client. Razorpay prefills the
