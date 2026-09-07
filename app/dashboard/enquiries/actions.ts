@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
+  addEnquiryNote,
   setEnquiryStatus,
   deleteEnquiry,
   ENQUIRY_STATUSES,
@@ -138,6 +139,27 @@ function statusAfter(
   if (stage === 2 && current === 'new') return 'reviewing';
   if (stage === 4 && current !== 'won') return 'won';
   return null;
+}
+
+/**
+ * Files what happened when somebody rang or messaged a lead.
+ *
+ * Notes are append-only by design (see `addEnquiryNote`), so this only ever
+ * inserts. A note too short to mean anything is dropped silently rather than
+ * refused: the storage layer already declines it, and an error banner over a
+ * stray Enter press would be noise on the one screen that has to stay quick to
+ * use between calls.
+ */
+export async function addNoteAction(formData: FormData): Promise<void> {
+  await requireSession();
+
+  const id = String(formData.get('id') ?? '');
+  const body = String(formData.get('body') ?? '');
+  if (!id) return;
+
+  await addEnquiryNote(id, body);
+  revalidatePath(`/dashboard/enquiries/${id}`);
+  revalidatePath('/dashboard/enquiries');
 }
 
 export async function removeEnquiry(formData: FormData): Promise<void> {

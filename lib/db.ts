@@ -163,8 +163,13 @@ const SCHEMA = `
     external_id   TEXT,
     welcomed_at   TEXT
   );
-  CREATE UNIQUE INDEX IF NOT EXISTS enquiries_external
-    ON enquiries (external_id) WHERE external_id IS NOT NULL;
+  /*
+   * enquiries_external is NOT here. It indexes external_id, which is added by
+   * addColumnIfMissing after this runs, so on any database created before
+   * that column existed this statement would throw - and it would take the
+   * whole of SCHEMA with it, leaving getDb() unable to open the file at all.
+   * See createLateIndexes() below.
+   */
   CREATE INDEX IF NOT EXISTS enquiries_created_at ON enquiries (created_at DESC);
   CREATE INDEX IF NOT EXISTS enquiries_status ON enquiries (status);
   /*
@@ -550,6 +555,26 @@ function addColumnIfMissing(
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
+/**
+ * Indexes over columns that `addColumnIfMissing` supplies, so they can only be
+ * created once those columns are certain to exist.
+ *
+ * They cannot live in `SCHEMA`. That runs first, on a database whose tables
+ * already exist, where `CREATE TABLE IF NOT EXISTS` is a no-op and the new
+ * column is therefore still absent — so the statement throws, `db.exec(SCHEMA)`
+ * aborts, and `getDb()` fails for the life of the process. Every page that
+ * reads anything then breaks at once, and `isDbConfigured()` catches the
+ * throw and reports the database as merely unconfigured, so the dashboard
+ * shows an empty pipeline rather than an error. That is the failure this
+ * separation exists to prevent, and it was a real one.
+ */
+function createLateIndexes(db: DatabaseSync): void {
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS enquiries_external
+      ON enquiries (external_id) WHERE external_id IS NOT NULL;
+  `);
+}
+
 export function getDb(): DatabaseSync {
   if (!global._dhSqlite) {
     mkdirSync(dirname(file), { recursive: true });
@@ -643,6 +668,8 @@ export function getDb(): DatabaseSync {
     addColumnIfMissing(db, 'enquiries', 'external_id', 'TEXT');
     // When the automatic thank-you went out, so it goes exactly once.
     addColumnIfMissing(db, 'enquiries', 'welcomed_at', 'TEXT');
+
+    createLateIndexes(db);
     global._dhSqlite = db;
   }
   return global._dhSqlite;

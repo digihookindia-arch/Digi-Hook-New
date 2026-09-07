@@ -6,7 +6,12 @@ import {
   saveEnquiry,
   type Enquiry,
 } from '@/lib/enquiries';
-import { fetchLeadSheet, isLeadSheetConfigured, type SheetLead } from '@/lib/leadSheet';
+import {
+  fetchLeadSheet,
+  isLeadSheetConfigured,
+  isReadingPublicly,
+  type SheetLead,
+} from '@/lib/leadSheet';
 import { newLeadEmail } from '@/lib/milestoneEmails';
 import { sendWhatsapp } from '@/lib/whatsapp';
 import { newLeadWhatsapp } from '@/lib/whatsappMessages';
@@ -63,13 +68,16 @@ export async function GET(request: NextRequest) {
     }
 
     const enquiry = await saveEnquiry({
-      service: lead.service || 'Website (Meta lead ad)',
+      // The form's own first question, so the dashboard groups these the way
+      // the website enquiries are already grouped.
+      service: lead.answers[0]?.value || 'Website',
       name: lead.name,
       email: lead.email,
       phone: lead.phone,
-      company: lead.company || null,
-      // A lead ad gives a name and a number, nothing more. The brief is what
-      // the thank-you message is asking them for.
+      company: null,
+      // The form's answers are the brief. `answers` is the enquiry form's own
+      // branching shape and does not fit a lead ad, so the summary carries it
+      // — which is also what the Draft-proposal button pastes in.
       answers: {},
       summary: summaryFor(lead),
       source: 'sheet',
@@ -77,7 +85,8 @@ export async function GET(request: NextRequest) {
     });
     imported++;
 
-    if (await welcome(enquiry)) welcomed++;
+    // The first answer is the website type, which the reply names back.
+    if (await welcome(enquiry, lead.answers[0]?.value ?? '')) welcomed++;
   }
 
   return NextResponse.json({
@@ -87,22 +96,32 @@ export async function GET(request: NextRequest) {
     alreadyKnown: already,
     welcomed,
     unusableRows: sheet.skipped,
+    testLeadsIgnored: sheet.testLeads,
+    ...(isReadingPublicly() ? { warning: 'sheet is being read with no credentials' } : {}),
   });
 }
 
-/** What the studio sees on the lead before anyone has spoken to them. */
+/**
+ * The brief, as the person actually filled it in. This is what the studio
+ * reads before ringing, and what the Draft-proposal button pastes into a new
+ * proposal — so the form's answers come first and the ad attribution last.
+ */
 function summaryFor(lead: SheetLead): { label: string; value: string }[] {
   return [
-    { label: 'Source', value: 'Meta lead ad' },
-    ...(lead.service ? [{ label: 'Interested in', value: lead.service }] : []),
-    ...(lead.company ? [{ label: 'Business', value: lead.company }] : []),
+    ...lead.answers,
+    { label: 'Source', value: sourceLine(lead) },
     ...(lead.createdAt ? [{ label: 'Submitted', value: lead.createdAt }] : []),
-    {
-      label: 'Brief',
-      value:
-        'Not given — a lead ad collects contact details only. The automatic reply asks what they are looking to build.',
-    },
   ];
+}
+
+function sourceLine(lead: SheetLead): string {
+  const where =
+    lead.platform === 'ig'
+      ? 'Instagram'
+      : lead.platform === 'fb'
+        ? 'Facebook'
+        : lead.platform || 'Meta';
+  return lead.campaign ? `${where} lead ad — ${lead.campaign}` : `${where} lead ad`;
 }
 
 /**
@@ -110,16 +129,18 @@ function summaryFor(lead: SheetLead): { label: string; value: string }[] {
  * sending: a duplicate message to a stranger is worse than a missed one, so
  * the stamp is taken first and a failure afterwards is not retried.
  */
-async function welcome(enquiry: Enquiry): Promise<boolean> {
+async function welcome(enquiry: Enquiry, wants: string): Promise<boolean> {
   if (!(await markWelcomed(enquiry.id))) return false;
 
-  await sendWhatsapp(newLeadWhatsapp({ name: enquiry.name, phone: enquiry.phone }));
+  await sendWhatsapp(
+    newLeadWhatsapp({ name: enquiry.name, phone: enquiry.phone, wants })
+  );
 
   if (enquiry.email) {
     try {
       await sendEmail({
         to: enquiry.email,
-        ...newLeadEmail({ name: enquiry.name }),
+        ...newLeadEmail({ name: enquiry.name, wants }),
         replyTo: STUDIO_INBOX,
       });
     } catch (e) {

@@ -148,6 +148,14 @@ added to `SCHEMA` never reaches a database created before it. Add it to `SCHEMA`
 call `addColumnIfMissing()` in `getDb()` — that pair is the whole migration story, and
 columns are only ever added, never dropped or retyped.
 
+**An index over a lazily-added column must never live in `SCHEMA`.** `SCHEMA` runs
+*before* the `addColumnIfMissing()` calls, so on an existing database the column is not
+there yet and `CREATE INDEX … ON enquiries (external_id)` throws — taking the whole of
+`db.exec(SCHEMA)` with it, so `getDb()` fails for the life of the process. Worse,
+`isDbConfigured()` catches that throw and reports the database as merely *unconfigured*,
+so the dashboard renders an empty pipeline rather than an error. Put those statements in
+`createLateIndexes()`, which runs after the column additions. This has bitten once.
+
 **Migrations run once per process, on the first `getDb()`.** The handle is cached on
 `globalThis`, so a dev server that was already running when you added a column keeps the
 old handle and never migrates — queries then fail with `no such column`. Restart the dev
@@ -201,8 +209,36 @@ page and action — **do not move it into middleware**. Claude drafts proposals 
 structured outputs (typed objects, not markdown). Proposal pages are excluded from
 search three ways: `noindex`, `robots.ts` disallow, and absence from the sitemap.
 
-`/dashboard/enquiries` lists submitted briefs; "Draft proposal" opens `/dashboard/new`
-prefilled from the enquiry and links the two on save.
+### Leads (`/dashboard/enquiries`)
+
+**One pipeline, not two.** Website briefs, `/get-quote` leads and Meta lead-ad rows are
+all `enquiries`, told apart by `source` — the client's call, so that "Draft proposal"
+works identically wherever the lead came from. It opens `/dashboard/new` prefilled from
+the enquiry and links the two on save.
+
+- **The Google Sheet is read-only, always.** It is Meta's own output; the studio's
+  status, notes and everything else live here. `lib/leadSheet.ts` is the pure mapping
+  half (`mapSheetRows`, `parseCsv`, `humanise`) and `/api/cron/lead-sync` the import.
+  Meta's row id is the dedupe key — a row without one is skipped, or it would arrive
+  again tomorrow and the person would be messaged again with it. Meta's seeded
+  `<test lead: …` submission is filtered, and its `lead_status` column ("CREATED") is
+  deliberately **not** imported: the sheet is read-only, so nothing we did could ever
+  move it off that value.
+- **The automatic thank-you goes exactly once**, claimed via `markWelcomed()` before
+  sending — a duplicate message to a stranger is worse than a missed one. It names the
+  website type they asked for, because asking "what are you looking for?" would say
+  plainly that nobody read their answers.
+- **`lib/leadTemplates.ts` is hand-sent follow-up, and must stay that way.** It builds
+  `wa.me` and `mailto` links that open the studio's own apps with the message typed; a
+  person presses send. AiSensy can only send Meta-approved templates and refuses free
+  text outside the 24-hour window, so this could not be automated — and should not be:
+  a lead marked "no response" has already ignored one automated message. The preview on
+  screen and the link's payload come from the same builder, so there is never a version
+  the studio read and a different one the client received.
+- **Notes are append-only** (`enquiry_notes`). A follow-up history that can be edited is
+  one nobody trusts.
+- The list page reports a broken sheet import itself, naming the missing variables —
+  a lead pipeline that has silently stopped must not look like a quiet week.
 
 ### Client-facing proposal stages
 `/proposals/<slug>` has three numbered stages — 01 the proposal, 02 `/status`

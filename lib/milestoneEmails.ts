@@ -303,20 +303,20 @@ export function proposalAcceptedEmail(input: {
  * No step track: this is not on the four-stage proposal journey, and showing a
  * sales pipeline to someone who has not spoken to anyone yet would be absurd.
  */
-export function newLeadEmail(input: { name: string }): MilestoneMail {
+export function newLeadEmail(input: { name: string; wants?: string }): MilestoneMail {
+  const wants = (input.wants || 'website').toLowerCase();
   return {
     subject: 'Thanks for your enquiry — one quick question — Digi Hook',
     body: [
       `Hi ${firstName(input.name)},`,
       '',
-      'Thank you for getting in touch with Digi Hook. We build websites, online',
-      'stores and industry platforms out of Noida.',
+      `Thank you for your enquiry about a ${wants}. We are an IT solutions and`,
+      'creative agency in Noida, and one of our team will call you within one',
+      'working day to talk it through.',
       '',
-      'So we can be useful rather than generic on our first call — what are you',
-      'looking to build, and is there a site you already have?',
-      '',
-      'Just reply to this email, or message us on WhatsApp. Either way someone',
-      'will call you within one working day.',
+      'If there is anything else you would like us to know before then — a site',
+      'you already have, a deadline, or something specific you need it to do —',
+      'just reply to this email or message us on WhatsApp.',
       ...signOff(),
     ].join('\n'),
     html: milestoneEmailHtml({
@@ -324,15 +324,15 @@ export function newLeadEmail(input: { name: string }): MilestoneMail {
         'Thanks for your enquiry — tell us what you are looking to build and we will call within one working day.',
       kicker: 'Enquiry received',
       headline: 'Thanks for<br>getting in<br>touch.',
-      leadHeading: 'One quick question.',
+      leadHeading: `Your enquiry about a ${wants}.`,
       leadBody:
-        'So we can be useful rather than generic on our first call — what are you looking to build, and is there a site you already have? Reply here or message us on WhatsApp, and someone will call you within one working day.',
+        'One of our team will call you within one working day to talk it through. If there is anything else you would like us to know before then — a site you already have, a deadline, or something specific you need it to do — just reply here or message us on WhatsApp.',
       detailLeftLabel: 'What happens next',
       detailLeftValue: 'A call',
       detailRightLabel: 'When',
       detailRightValue: 'Within 1 working day',
       ctaText: 'Reply on WhatsApp',
-      ctaHref: whatsappUrl('Hello Digi Hook, I am looking to build'),
+      ctaHref: whatsappUrl(`Hello Digi Hook, about my enquiry for a ${wants} —`),
       secondaryLine:
         `Or call us on <a href="tel:${site.phoneHref}" style="color:#b02510;text-decoration:underline;">${site.phoneDisplay}</a>. ` +
         `We are open ${site.hoursLine}.`,

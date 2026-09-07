@@ -148,27 +148,30 @@ export function paymentReceivedWhatsapp(input: {
 /**
  * 5 · New lead — the automatic reply to a Meta lead-ad submission
  *
- *   Hi {{1}}, thank you for your enquiry with Digi Hook. So we can help
- *   properly — what exactly are you looking to build? Reply here and a
- *   member of our team will call you within one working day.
+ *   Hi {{1}}, thanks for your enquiry with Digi Hook about a {{2}}. One of
+ *   our team will call you within one working day. If there is anything else
+ *   you would like us to know before then, just reply here.
  *
- * One variable, and the message ends in a question on purpose. A lead-ad
- * submission is a name and a number with no context; the studio still has to
- * ring and ask what the person actually wants. Asking here means some of them
- * answer first, in writing, and the call starts from something.
+ * It names what they asked for. The form already collects the website type, so
+ * asking "what are you looking for?" would tell them plainly that nobody read
+ * their answers — the single fastest way to lose a lead that arrived warm.
  *
  * It arrives unprompted, so the template must be honest about who is writing
- * and give them a way to stop — which is Meta's rule as much as good manners.
+ * and give them a way to stop — Meta's rule as much as good manners.
  */
 export function newLeadWhatsapp(input: {
   name: string;
   phone: string;
+  /** What they said they wanted, already humanised. */
+  wants: string;
 }): WhatsappMessage {
   return {
     campaign: 'newLead',
     phone: input.phone,
     name: input.name,
-    params: [firstName(input.name)],
+    // Falls back to "website" so the sentence still reads if the form ever
+    // stops asking, rather than leaving a hole mid-message.
+    params: [firstName(input.name), (input.wants || 'website').toLowerCase()],
   };
 }
 
