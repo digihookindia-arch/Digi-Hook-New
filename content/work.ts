@@ -212,14 +212,14 @@ export const work: WorkItem[] = [
       'Built once and served as finished files — nothing is assembled while a visitor waits.',
   },
   /*
-   * The three entries below were measured on 2026-09-07 with the Lighthouse CLI
-   * (v12.8.2, its default mobile preset) rather than PageSpeed Insights, and the
-   * cards say so. PSI without an API key shares one anonymous quota with the
-   * whole internet and returned 429 on every attempt that day. A local run and a
-   * PSI run are not the same hardware and do not produce interchangeable
-   * numbers — which is precisely why \`source\` is printed beside every score.
-   * Re-measure these through PSI once \`PAGESPEED_API_KEY\` exists and change
-   * \`source\` back to 'PageSpeed Insights' in the same edit.
+   * The three entries below were first measured with the local Lighthouse CLI,
+   * because keyless PageSpeed Insights shares one anonymous quota with the
+   * whole internet and was returning 429 all day. They were re-measured through
+   * PSI on 2026-09-07 with the key in the server's .env.local, and every one came
+   * out higher than the local run — Google runs Lighthouse on its own hardware,
+   * not on a laptop with a dev server beside it. That gap is the whole reason
+   * `source` is printed beside each score instead of being left to the reader
+   * to assume. Measure through PSI from here on; the studio has a key.
    */
   {
     id: 'apnaheaven',
@@ -233,10 +233,10 @@ export const work: WorkItem[] = [
     shot: '/work/apnaheaven.webp',
     shotAlt:
       'Home page of apnaheaven.com — a dusk photograph of curved high-rise towers behind trees, with the heading “Apna Heaven” above buttons reading Explore Properties and Book a Consultation.',
-    scores: { performance: 85, accessibility: 95, bestPractices: 100, seo: 100 },
+    scores: { performance: 91, accessibility: 95, bestPractices: 100, seo: 100 },
     measured: '2026-09-07',
     strategy: 'mobile',
-    source: 'Lighthouse',
+    source: 'PageSpeed Insights',
     tech: ['Next.js', 'React', 'Tailwind CSS', 'next/image', 'Nginx'],
     rendering: 'SSR',
     renderingNote:
@@ -254,14 +254,14 @@ export const work: WorkItem[] = [
     shot: '/work/ramdelotraders.webp',
     shotAlt:
       'Home page of ramdelotraders.com — a cream hero reading “Pure Ingredients, Authentic Teas” beside a photograph of a Bablu Channa tea pouch in an arched frame.',
-    // Performance is the outlier on this page, and it is published as measured.
-    // The catalogue home carries a lot of product photography above the fold;
-    // 71 is a fact about the page as it stands today, not a number to round up.
-    // Re-measure after any image work rather than editing it here.
-    scores: { performance: 71, accessibility: 98, bestPractices: 100, seo: 100 },
+    // Performance is the lowest number on this page, and it is published as
+    // measured. The catalogue home carries a lot of product photography above
+    // the fold; 80 is a fact about the page as it stands today, not a figure to
+    // round up. Re-measure after any image work rather than editing it here.
+    scores: { performance: 80, accessibility: 98, bestPractices: 100, seo: 100 },
     measured: '2026-09-07',
     strategy: 'mobile',
-    source: 'Lighthouse',
+    source: 'PageSpeed Insights',
     tech: ['Next.js', 'React', 'Tailwind CSS', 'Razorpay', 'Nginx'],
     rendering: 'ISR',
     renderingNote:
@@ -279,10 +279,10 @@ export const work: WorkItem[] = [
     shot: '/work/therosadori.webp',
     shotAlt:
       'Home page of therosadori.com — a photograph of jute and cotton bags arranged on a terrace table above a lake, under the Rosa Dori wordmark.',
-    scores: { performance: 84, accessibility: 91, bestPractices: 96, seo: 92 },
+    scores: { performance: 94, accessibility: 91, bestPractices: 96, seo: 100 },
     measured: '2026-09-07',
     strategy: 'mobile',
-    source: 'Lighthouse',
+    source: 'PageSpeed Insights',
     tech: ['Next.js', 'React', 'CSS Modules', 'next/image', 'Nginx'],
     rendering: 'SSR',
     renderingNote:
