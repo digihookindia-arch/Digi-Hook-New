@@ -195,21 +195,27 @@ export const work: WorkItem[] = [
     num: '03',
     category: 'Portfolio',
     name: '10 Penny Kitchens & Wardrobes',
-    domain: '10penny.digihook.in',
-    url: 'https://10penny.digihook.in/',
+    // Moved off 10penny.digihook.in to its own domain, and rebuilt on the way:
+    // the old subdomain was a static export served straight off disk and no
+    // longer resolves at all, so everything below was re-read on 2026-09-07.
+    domain: '10pennykitchens.com',
+    url: 'https://10pennykitchens.com/',
     blurb:
       'A modular-kitchen studio’s portfolio site. Full-bleed project photography carries the whole argument, so the build spends its budget on how quickly those images arrive.',
-    shot: '/work/10penny.webp',
+    shot: '/work/10pennykitchens.webp',
     shotAlt:
-      'Home page of 10penny.digihook.in — a full-width photograph of a sage-green modular kitchen with a marble island and a stack of built-in ovens, under the 10 Penny Kitchens & Wardrobes wordmark.',
-    scores: { performance: 94, accessibility: 97, bestPractices: 100, seo: 100 },
-    measured: '2026-08-13',
+      'Home page of 10pennykitchens.com — a full-width photograph of a pale grey handleless kitchen with lit under-cabinet strips and a bowl of fruit on the island, under the 10 Penny Kitchens & Wardrobes wordmark.',
+    // Two PSI runs on an idle server read 84 then 88; the later one is
+    // published. A rebuilt site is a different site — this is not the 94 the
+    // static export scored in August, and it should not be carried over.
+    scores: { performance: 88, accessibility: 97, bestPractices: 100, seo: 100 },
+    measured: '2026-09-07',
     strategy: 'mobile',
     source: 'PageSpeed Insights',
-    tech: ['Next.js', 'React', 'Tailwind CSS', 'Static export', 'Nginx'],
-    rendering: 'SSG',
+    tech: ['Next.js', 'React', 'Tailwind CSS', 'Node.js', 'Nginx'],
+    rendering: 'ISR',
     renderingNote:
-      'Built once and served as finished files — nothing is assembled while a visitor waits.',
+      'Pre-built and refreshed in the background on a five-minute window, so the project pages change without a rebuild.',
   },
   /*
    * Measured through PageSpeed Insights on 2026-09-07, on mobile, with the key
@@ -242,7 +248,7 @@ export const work: WorkItem[] = [
     measured: '2026-09-07',
     strategy: 'mobile',
     source: 'PageSpeed Insights',
-    tech: ['Next.js', 'React', 'Tailwind CSS', 'next/image', 'Nginx'],
+    tech: ['Next.js', 'React', 'Tailwind CSS', 'Node.js', 'Nginx'],
     rendering: 'SSR',
     renderingNote:
       'Assembled on the server for each visit, so a project that changes during the day is never served from yesterday’s copy.',
@@ -266,7 +272,7 @@ export const work: WorkItem[] = [
     measured: '2026-09-07',
     strategy: 'mobile',
     source: 'PageSpeed Insights',
-    tech: ['Next.js', 'React', 'Tailwind CSS', 'Razorpay', 'Nginx'],
+    tech: ['Next.js', 'React', 'Tailwind CSS', 'Node.js', 'Razorpay', 'Nginx'],
     rendering: 'ISR',
     renderingNote:
       'Pre-built and refreshed in the background on a five-minute window, so prices and stock move without a rebuild.',

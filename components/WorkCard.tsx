@@ -15,10 +15,12 @@ import { ScoreRow } from './ScoreRings';
  *
  * **The popup only works on client vhosts that opt in.** The site has to send
  * `Content-Security-Policy: frame-ancestors 'self' https://digihook.in` —
- * added to swarnikajewellers.in, totravelistolearn.in and 10penny.digihook.in
- * on 2026-08-13. Without it the box renders empty: CloudPanel's shared
- * `/etc/nginx/global_settings` puts `X-Frame-Options: SAMEORIGIN` on every site
- * on the VPS, and frame-ancestors is what supersedes it in modern browsers.
+ * added to swarnikajewellers.in and totravelistolearn.in on 2026-08-13, and to
+ * 10pennykitchens.com on 2026-09-07 when that client moved off the
+ * 10penny.digihook.in subdomain. Without it the box renders empty:
+ * CloudPanel's shared `/etc/nginx/global_settings` puts
+ * `X-Frame-Options: SAMEORIGIN` on every site on the VPS, and frame-ancestors
+ * is what supersedes it in modern browsers.
  * If a preview ever goes blank, check that header on the client site first —
  * a CloudPanel update that rewrites the vhost will silently drop the line.
  *
