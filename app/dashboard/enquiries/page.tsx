@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, MessageSquare } from 'lucide-react';
+import { ArrowRight, CalendarClock, MessageSquare } from 'lucide-react';
 import {
   listEnquiries,
   noteCounts,
@@ -10,6 +10,7 @@ import {
   type EnquiryStatus,
 } from '@/lib/enquiries';
 import { isDbConfigured } from '@/lib/db';
+import { byFollowUp, followUpState, formatFollowUp, istNow } from '@/lib/leadCrm';
 import { isEmailConfigured } from '@/lib/email';
 import { isLeadSheetConfigured, isReadingPublicly, leadSheetBlockers } from '@/lib/leadSheet';
 import { requireSession } from '../actions';
@@ -31,11 +32,11 @@ const STATUS_TONE: Record<EnquiryStatus, string> = {
 export default async function EnquiriesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; view?: string }>;
 }) {
   await requireSession();
 
-  const { status } = await searchParams;
+  const { status, view } = await searchParams;
   const configured = isDbConfigured();
   const all = configured ? await listEnquiries() : [];
   const notes = configured ? await noteCounts() : new Map<string, number>();
@@ -46,7 +47,23 @@ export default async function EnquiriesPage({
   const active = ENQUIRY_STATUSES.includes(status as EnquiryStatus)
     ? (status as EnquiryStatus)
     : null;
-  const enquiries = active ? all.filter((e) => e.status === active) : all;
+
+  // "Who am I calling today" is a different question from "what stage is this
+  // lead at", so it is its own filter rather than another status.
+  const now = istNow();
+  const dueNow = all.filter(
+    (e) =>
+      e.status !== 'won' &&
+      e.status !== 'lost' &&
+      ['overdue', 'today'].includes(followUpState(e.followUpAt, now))
+  );
+
+  const enquiries =
+    view === 'due'
+      ? byFollowUp(dueNow, now)
+      : active
+        ? all.filter((e) => e.status === active)
+        : all;
 
   const counts = new Map<EnquiryStatus, number>();
   for (const e of all) counts.set(e.status, (counts.get(e.status) ?? 0) + 1);
@@ -120,7 +137,22 @@ export default async function EnquiriesPage({
         ) : (
           <>
             <div className="mb-7 flex flex-wrap gap-2">
-              <Filter href="/dashboard/enquiries" label="All" count={all.length} on={!active} />
+              {/* First, and separated, because it is the only one that answers
+                  "what do I have to do now" rather than "how is the pipeline". */}
+              <Filter
+                href="/dashboard/enquiries?view=due"
+                label="To call"
+                count={dueNow.length}
+                on={view === 'due'}
+                urgent={dueNow.length > 0}
+              />
+              <span className="w-3" aria-hidden="true" />
+              <Filter
+                href="/dashboard/enquiries"
+                label="All"
+                count={all.length}
+                on={!active && view !== 'due'}
+              />
               {ENQUIRY_STATUSES.filter((s) => (counts.get(s) ?? 0) > 0).map((s) => (
                 <Filter
                   key={s}
@@ -134,7 +166,9 @@ export default async function EnquiriesPage({
 
             {enquiries.length === 0 ? (
               <p className="m-0 py-12 text-[15.5px] leading-[1.6] text-neutral-700">
-                Nothing at this stage.
+                {view === 'due'
+                  ? 'Nobody to call right now. A lead appears here once its follow-up time arrives.'
+                  : 'Nothing at this stage.'}
               </p>
             ) : (
               <div className="border-t-2 border-text">
@@ -155,29 +189,35 @@ function Filter({
   label,
   count,
   on,
+  urgent = false,
 }: {
   href: string;
   label: string;
   count: number;
   on: boolean;
+  urgent?: boolean;
 }) {
+  const tone = on
+    ? 'border-text bg-text text-bg'
+    : urgent
+      ? 'border-accent-600 text-accent-700 hover:bg-accent-600 hover:text-white'
+      : 'border-neutral-400 text-neutral-800 hover:border-text hover:text-text';
+
   return (
     <Link
       href={href}
       aria-current={on ? 'page' : undefined}
-      className={`border-2 px-3.5 py-2.5 text-[13.5px] font-semibold leading-none transition-colors ${
-        on
-          ? 'border-text bg-text text-bg'
-          : 'border-neutral-400 text-neutral-800 hover:border-text hover:text-text'
-      }`}
+      className={`border-2 px-3.5 py-2.5 text-[13.5px] font-semibold leading-none transition-colors ${tone}`}
     >
       {label}{' '}
-      <span className={on ? 'text-neutral-400' : 'text-neutral-700'}>{count}</span>
+      <span className={on ? 'text-neutral-400' : undefined}>{count}</span>
     </Link>
   );
 }
 
 function Row({ enquiry: e, notes }: { enquiry: Enquiry; notes: number }) {
+  const due = followUpState(e.followUpAt);
+
   return (
     <Link
       href={`/dashboard/enquiries/${e.id}`}
@@ -201,6 +241,17 @@ function Row({ enquiry: e, notes }: { enquiry: Enquiry; notes: number }) {
             <span className="inline-flex items-center gap-1.5">
               <MessageSquare size={12} aria-hidden="true" />
               {notes} {notes === 1 ? 'note' : 'notes'}
+            </span>
+          ) : null}
+          {due !== 'none' ? (
+            <span
+              className={`inline-flex items-center gap-1.5 ${
+                due === 'overdue' ? 'font-semibold text-accent-700' : ''
+              }`}
+            >
+              <CalendarClock size={12} aria-hidden="true" />
+              {due === 'overdue' ? 'Overdue · ' : due === 'today' ? 'Today · ' : ''}
+              {formatFollowUp(e.followUpAt)}
             </span>
           ) : null}
         </div>

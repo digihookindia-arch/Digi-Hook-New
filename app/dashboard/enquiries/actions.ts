@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import {
   addEnquiryNote,
   setEnquiryStatus,
+  setFollowUp,
   deleteEnquiry,
   ENQUIRY_STATUSES,
   type EnquiryStatus,
@@ -159,6 +160,40 @@ export async function addNoteAction(formData: FormData): Promise<void> {
   await addEnquiryNote(id, body);
   revalidatePath(`/dashboard/enquiries/${id}`);
   revalidatePath('/dashboard/enquiries');
+}
+
+/**
+ * The whole of the lite CRM in one submit: status, the next call, and a note.
+ *
+ * One form rather than three, because these are filled in together — you come
+ * off a call, set the outcome, book the next one and write what was said, and
+ * three separate Update buttons is three chances to save two of them and lose
+ * the third. Every field is optional: leaving the note empty is normal, and
+ * clearing the date is how a follow-up is cancelled.
+ *
+ * Status is checked against the list and a bad value is ignored rather than
+ * refused, so a stale tab cannot blank someone's pipeline stage. The date is
+ * validated inside `setFollowUp`, at the write boundary.
+ */
+export async function updateLeadAction(formData: FormData): Promise<void> {
+  await requireSession();
+
+  const id = String(formData.get('id') ?? '');
+  if (!id) return;
+
+  const status = String(formData.get('status') ?? '');
+  if (ENQUIRY_STATUSES.includes(status as EnquiryStatus)) {
+    await setEnquiryStatus(id, status as EnquiryStatus);
+  }
+
+  await setFollowUp(id, String(formData.get('followUpAt') ?? ''));
+
+  // Short of two characters is not a note; addEnquiryNote declines it and the
+  // rest of the save still stands.
+  await addEnquiryNote(id, String(formData.get('body') ?? ''));
+
+  revalidatePath('/dashboard/enquiries');
+  revalidatePath(`/dashboard/enquiries/${id}`);
 }
 
 export async function removeEnquiry(formData: FormData): Promise<void> {

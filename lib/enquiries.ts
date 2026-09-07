@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { getDb } from './db';
 import type { Answers } from './enquiry';
+import { cleanFollowUp, istNow } from './leadCrm';
 
 /**
  * Enquiries captured by the public contact form.
@@ -88,6 +89,11 @@ export type Enquiry = {
   externalId: string | null;
   /** When the automatic thank-you went out. Null means it has not. */
   welcomedAt: string | null;
+  /**
+   * When to ring them next - a naive local datetime, no zone. See
+   * lib/leadCrm.ts. Null means nothing is booked.
+   */
+  followUpAt: string | null;
 };
 
 type Row = {
@@ -105,6 +111,7 @@ type Row = {
   source: string | null;
   external_id: string | null;
   welcomed_at: string | null;
+  follow_up_at: string | null;
 };
 
 function toEnquiry(row: Row): Enquiry {
@@ -134,6 +141,7 @@ function toEnquiry(row: Row): Enquiry {
     })(),
     externalId: row.external_id,
     welcomedAt: row.welcomed_at,
+    followUpAt: row.follow_up_at,
   };
 }
 
@@ -165,6 +173,7 @@ export async function saveEnquiry(input: {
     source: input.source ?? 'website',
     externalId: input.externalId ?? null,
     welcomedAt: null,
+    followUpAt: null,
   };
 
   getDb()
@@ -226,6 +235,35 @@ export async function setEnquiryStatus(
   status: EnquiryStatus
 ): Promise<void> {
   getDb().prepare('UPDATE enquiries SET status = ? WHERE id = ?').run(status, id);
+}
+
+/**
+ * Books the next call, or clears it when passed nothing.
+ *
+ * Validated at the write boundary rather than trusted from the form, because
+ * an unparseable value stored here would read back as "no follow-up" and the
+ * lead would drop off the call sheet silently — the one failure this field
+ * exists to prevent.
+ */
+export async function setFollowUp(
+  id: string,
+  value: string | null | undefined
+): Promise<void> {
+  getDb()
+    .prepare('UPDATE enquiries SET follow_up_at = ? WHERE id = ?')
+    .run(cleanFollowUp(value), id);
+}
+
+/** Leads whose follow-up has come due, for the dashboard's own badge. */
+export async function dueFollowUpCount(now: string = istNow()): Promise<number> {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS n FROM enquiries
+       WHERE follow_up_at IS NOT NULL AND follow_up_at <= ?
+         AND status NOT IN ('won', 'lost')`
+    )
+    .get(now) as { n: number };
+  return row.n;
 }
 
 /** Called when a proposal is drafted from an enquiry, linking the two. */

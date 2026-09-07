@@ -161,7 +161,8 @@ const SCHEMA = `
     proposal_slug TEXT,
     source        TEXT NOT NULL DEFAULT 'website',
     external_id   TEXT,
-    welcomed_at   TEXT
+    welcomed_at   TEXT,
+    follow_up_at  TEXT
   );
   /*
    * enquiries_external is NOT here. It indexes external_id, which is added by
@@ -668,6 +669,9 @@ export function getDb(): DatabaseSync {
     addColumnIfMissing(db, 'enquiries', 'external_id', 'TEXT');
     // When the automatic thank-you went out, so it goes exactly once.
     addColumnIfMissing(db, 'enquiries', 'welcomed_at', 'TEXT');
+    // When to ring this lead next. A naive local datetime - see lib/leadCrm.ts
+    // for why it carries no zone. Null means nothing is booked.
+    addColumnIfMissing(db, 'enquiries', 'follow_up_at', 'TEXT');
 
     createLateIndexes(db);
     global._dhSqlite = db;

@@ -9,17 +9,17 @@ import {
 } from '@/lib/enquiries';
 import { getJourney } from '@/lib/journey';
 import { isEmailConfigured } from '@/lib/email';
+import {
+  FOLLOW_UP_LABELS,
+  followUpState,
+  formatFollowUp,
+} from '@/lib/leadCrm';
 import { formatWhatsappNumber } from '@/lib/phone';
 import { SITE_URL } from '@/lib/site';
 import { ClientUpdates } from '@/components/ClientUpdates';
 import { FollowUpPicker } from '@/components/FollowUpPicker';
 import { requireSession } from '../../actions';
-import {
-  addNoteAction,
-  updateEnquiryStatus,
-  removeEnquiry,
-  sendMilestoneAction,
-} from '../actions';
+import { removeEnquiry, sendMilestoneAction, updateLeadAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +48,7 @@ export default async function EnquiryPage({
   // follow-up messages name back at the person.
   const wants = enquiry.summary[0]?.value ?? enquiry.service;
   const reachable = formatWhatsappNumber(enquiry.phone);
+  const due = followUpState(enquiry.followUpAt);
 
   return (
     <main>
@@ -72,6 +73,21 @@ export default async function EnquiryPage({
               <span className="border-2 border-neutral-400 px-2.5 py-1 text-[11.5px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
                 {ENQUIRY_SOURCE_LABELS[enquiry.source]}
               </span>
+              {/* An overdue call is the one thing on this page that should
+                  interrupt you, so it is the only thing wearing the accent. */}
+              {due !== 'none' ? (
+                <span
+                  className={`border-2 px-2.5 py-1 text-[11.5px] font-semibold uppercase leading-none tracking-[0.1em] ${
+                    due === 'overdue'
+                      ? 'border-accent-600 text-accent-700'
+                      : 'border-text text-text'
+                  }`}
+                >
+                  {due === 'upcoming'
+                    ? formatFollowUp(enquiry.followUpAt)
+                    : `${FOLLOW_UP_LABELS[due]} · ${formatFollowUp(enquiry.followUpAt)}`}
+                </span>
+              ) : null}
               {/* Whether the automatic thank-you has gone changes what you say
                   when you ring: they have either heard from us or they have not. */}
               {enquiry.source === 'sheet' ? (
@@ -122,6 +138,87 @@ export default async function EnquiryPage({
           {enquiry.company ? <Field label="Company">{enquiry.company}</Field> : null}
         </div>
 
+        {/* The lite CRM: outcome, next call, what was said — filled in
+            together, saved together. Placed above everything else because it
+            is what you touch after every conversation. */}
+        <section className="mb-9 border-2 border-text p-6">
+          <h2 className="m-0 mb-1.5 font-heading text-[22px] font-bold leading-[1.2] tracking-[-0.025em]">
+            Working this lead
+          </h2>
+          <p className="m-0 mb-6 text-[14px] leading-[1.55] text-neutral-700">
+            Set where they are, when to call next, and what was said. Saved in one go.
+          </p>
+
+          {/*
+            React resets an uncontrolled form once its action resolves, and it
+            resets to the defaults of the render it was mounted with — which is
+            the render *before* the save. Left alone, the fields snap back to
+            the old status and date, and a second Save writes those stale
+            values back over the new ones. Keying the form on what was saved
+            remounts it with the fresh defaults instead, which also clears the
+            note box, as a filed note should.
+          */}
+          <form action={updateLeadAction} key={`${enquiry.status}:${enquiry.followUpAt ?? ''}`}>
+            <input type="hidden" name="id" value={enquiry.id} />
+
+            <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-5">
+              <label className="block">
+                <span className="mb-2 block text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+                  Status
+                </span>
+                <select
+                  name="status"
+                  defaultValue={enquiry.status}
+                  className="block w-full border-2 border-neutral-400 bg-bg px-3.5 py-3 text-[15px] leading-[1.2] text-text focus:border-text focus:outline-none"
+                >
+                  {ENQUIRY_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {ENQUIRY_STATUS_LABELS[s]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+                  Next follow-up
+                </span>
+                <input
+                  type="datetime-local"
+                  name="followUpAt"
+                  defaultValue={enquiry.followUpAt ?? ''}
+                  className="block w-full border-2 border-neutral-400 bg-bg px-3.5 py-3 text-[15px] leading-[1.2] text-text focus:border-text focus:outline-none"
+                />
+                <span className="mt-1.5 block text-[13px] leading-[1.4] text-neutral-700">
+                  {enquiry.followUpAt
+                    ? `${FOLLOW_UP_LABELS[due]} · ${formatFollowUp(enquiry.followUpAt)}`
+                    : 'Nothing booked. Clear the field to cancel one.'}
+                </span>
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="mb-2 block text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
+                Add a note
+              </span>
+              <textarea
+                name="body"
+                rows={3}
+                maxLength={2000}
+                placeholder="Rang at 4pm — asked us to call back Thursday morning."
+                className="block w-full resize-y border-2 border-neutral-400 bg-bg px-4 py-3.5 text-[15px] leading-[1.55] text-text placeholder:text-neutral-600 focus:border-text focus:outline-none"
+              />
+            </label>
+
+            <button
+              type="submit"
+              className="mt-4 border-2 border-accent-600 bg-accent-600 px-5 py-3.5 text-[14.5px] font-semibold leading-none text-white transition-colors hover:border-accent-700 hover:bg-accent-700"
+            >
+              Save
+            </button>
+          </form>
+        </section>
+
         <ClientUpdates
           target={{ enquiryId: enquiry.id }}
           rows={journey.rows}
@@ -169,26 +266,6 @@ export default async function EnquiryPage({
             cannot be edited or removed once filed.
           </p>
 
-          <form action={addNoteAction} className="mb-6">
-            <input type="hidden" name="id" value={enquiry.id} />
-            <label className="block">
-              <span className="sr-only">Add a note about {enquiry.name}</span>
-              <textarea
-                name="body"
-                rows={3}
-                maxLength={2000}
-                placeholder="Rang at 4pm — asked us to call back Thursday morning."
-                className="block w-full resize-y border-2 border-neutral-400 bg-bg px-4 py-3.5 text-[15px] leading-[1.55] text-text placeholder:text-neutral-600 focus:border-text focus:outline-none"
-              />
-            </label>
-            <button
-              type="submit"
-              className="mt-3 border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
-            >
-              Add note
-            </button>
-          </form>
-
           {notes.length === 0 ? (
             <p className="m-0 border-t border-neutral-300 pt-5 text-[14.5px] leading-[1.6] text-neutral-700">
               Nothing filed yet.
@@ -209,33 +286,7 @@ export default async function EnquiryPage({
           )}
         </section>
 
-        <div className="flex flex-wrap items-end justify-between gap-6 border-t-2 border-text pt-6">
-          <form action={updateEnquiryStatus} className="flex flex-wrap items-end gap-3">
-            <input type="hidden" name="id" value={enquiry.id} />
-            <label className="block">
-              <span className="mb-2 block text-[12px] font-semibold uppercase leading-none tracking-[0.1em] text-neutral-700">
-                Status
-              </span>
-              <select
-                name="status"
-                defaultValue={enquiry.status}
-                className="border-2 border-neutral-400 bg-bg px-3.5 py-3 text-[14.5px] leading-none text-text"
-              >
-                {ENQUIRY_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {ENQUIRY_STATUS_LABELS[s]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="submit"
-              className="border-2 border-text px-4 py-3 text-[14px] font-semibold leading-none text-text transition-colors hover:bg-text hover:text-bg"
-            >
-              Update
-            </button>
-          </form>
-
+        <div className="flex flex-wrap items-center justify-between gap-6 border-t-2 border-text pt-6">
           {enquiry.proposalSlug ? (
             <Link
               href={`/dashboard/${enquiry.proposalSlug}`}
