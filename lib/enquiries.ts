@@ -10,16 +10,60 @@ import type { Answers } from './enquiry';
  * brief a proposal is drafted from.
  */
 
-/** Where an enquiry has got to. Drives the dashboard's filter and ordering. */
-export type EnquiryStatus = 'new' | 'reviewing' | 'drafted' | 'won' | 'lost';
+/**
+ * Where a lead has got to. Drives the dashboard's filter and ordering.
+ *
+ * Extended 2026-09-07 with the states a salesperson actually needs: a lead
+ * that will not answer the phone is neither "new" nor "lost", and calling it
+ * either loses the distinction between someone to chase and someone to write
+ * off.
+ *
+ * **Only ever add to this list.** Every value here is stored in the database
+ * as a string; renaming one silently orphans every row already carrying it,
+ * and `toEnquiry` would quietly reset those to 'new'.
+ */
+export type EnquiryStatus =
+  | 'new'
+  | 'reviewing'
+  | 'no-response'
+  | 'busy'
+  | 'drafted'
+  | 'proposal-sent'
+  | 'won'
+  | 'lost';
 
 export const ENQUIRY_STATUSES: EnquiryStatus[] = [
   'new',
   'reviewing',
+  'no-response',
+  'busy',
   'drafted',
+  'proposal-sent',
   'won',
   'lost',
 ];
+
+/** How each state reads in the dashboard. */
+export const ENQUIRY_STATUS_LABELS: Record<EnquiryStatus, string> = {
+  new: 'New',
+  reviewing: 'Talking',
+  'no-response': 'No response',
+  busy: 'Busy — call later',
+  drafted: 'Proposal drafted',
+  'proposal-sent': 'Proposal sent',
+  won: 'Won',
+  lost: 'Lost',
+};
+
+/** Where a lead came from. */
+export type EnquirySource = 'website' | 'quote' | 'sheet' | 'manual';
+
+export const ENQUIRY_SOURCE_LABELS: Record<EnquirySource, string> = {
+  website: 'Website form',
+  quote: 'Quote funnel',
+  sheet: 'Meta lead ad',
+  manual: 'Added by hand',
+};
 
 export type Enquiry = {
   id: string;
@@ -35,6 +79,15 @@ export type Enquiry = {
   summary: { label: string; value: string }[];
   status: EnquiryStatus;
   proposalSlug: string | null;
+  /** Where it came from. Everything stored before this reads back 'website'. */
+  source: EnquirySource;
+  /**
+   * The lead-ad row id, so re-importing a sheet updates rather than
+   * duplicates. Null for anything that did not come from one.
+   */
+  externalId: string | null;
+  /** When the automatic thank-you went out. Null means it has not. */
+  welcomedAt: string | null;
 };
 
 type Row = {
@@ -49,6 +102,9 @@ type Row = {
   summary: string;
   status: string;
   proposal_slug: string | null;
+  source: string | null;
+  external_id: string | null;
+  welcomed_at: string | null;
 };
 
 function toEnquiry(row: Row): Enquiry {
@@ -62,8 +118,22 @@ function toEnquiry(row: Row): Enquiry {
     company: row.company,
     answers: JSON.parse(row.answers) as Answers,
     summary: JSON.parse(row.summary) as { label: string; value: string }[],
-    status: row.status as EnquiryStatus,
+    // Checked against the list rather than cast: a status that no longer
+    // exists must read as 'new' and be visible, not crash the dashboard.
+    status: ENQUIRY_STATUSES.includes(row.status as EnquiryStatus)
+      ? (row.status as EnquiryStatus)
+      : 'new',
     proposalSlug: row.proposal_slug,
+    source: ((): EnquirySource => {
+      const s = row.source ?? 'website';
+      return (['website', 'quote', 'sheet', 'manual'] as const).includes(
+        s as EnquirySource
+      )
+        ? (s as EnquirySource)
+        : 'website';
+    })(),
+    externalId: row.external_id,
+    welcomedAt: row.welcomed_at,
   };
 }
 
@@ -75,6 +145,10 @@ export async function saveEnquiry(input: {
   company?: string | null;
   answers: Answers;
   summary: { label: string; value: string }[];
+  /** Defaults to the website form, which is where all of these began. */
+  source?: EnquirySource;
+  /** The lead-ad row id, when this came from the sheet. */
+  externalId?: string | null;
 }): Promise<Enquiry> {
   const enquiry: Enquiry = {
     id: randomUUID(),
@@ -88,13 +162,17 @@ export async function saveEnquiry(input: {
     summary: input.summary,
     status: 'new',
     proposalSlug: null,
+    source: input.source ?? 'website',
+    externalId: input.externalId ?? null,
+    welcomedAt: null,
   };
 
   getDb()
     .prepare(
       `INSERT INTO enquiries
-         (id, created_at, service, name, email, phone, company, answers, summary, status, proposal_slug)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (id, created_at, service, name, email, phone, company, answers, summary,
+          status, proposal_slug, source, external_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       enquiry.id,
@@ -107,7 +185,9 @@ export async function saveEnquiry(input: {
       JSON.stringify(enquiry.answers),
       JSON.stringify(enquiry.summary),
       enquiry.status,
-      enquiry.proposalSlug
+      enquiry.proposalSlug,
+      enquiry.source,
+      enquiry.externalId
     );
 
   return enquiry;
@@ -168,4 +248,88 @@ export async function newEnquiryCount(): Promise<number> {
     .prepare("SELECT COUNT(*) AS n FROM enquiries WHERE status = 'new'")
     .get() as { n: number };
   return row.n;
+}
+
+/* ── follow-up notes ────────────────────────────────────────────────────── */
+
+export type EnquiryNote = {
+  id: string;
+  enquiryId: string;
+  body: string;
+  createdAt: string;
+};
+
+/**
+ * Notes are append-only. A follow-up history that can be edited is one nobody
+ * trusts, and the question this exists to answer — "what did we already tell
+ * them?" — is only answerable if the earlier answers survive.
+ */
+export async function addEnquiryNote(
+  enquiryId: string,
+  body: string
+): Promise<EnquiryNote | null> {
+  const text = body.trim().slice(0, 2000);
+  if (text.length < 2) return null;
+
+  const note: EnquiryNote = {
+    id: randomUUID(),
+    enquiryId,
+    body: text,
+    createdAt: new Date().toISOString(),
+  };
+  getDb()
+    .prepare(
+      'INSERT INTO enquiry_notes (id, enquiry_id, body, created_at) VALUES (?, ?, ?, ?)'
+    )
+    .run(note.id, note.enquiryId, note.body, note.createdAt);
+  return note;
+}
+
+export async function listEnquiryNotes(enquiryId: string): Promise<EnquiryNote[]> {
+  const rows = getDb()
+    .prepare(
+      'SELECT * FROM enquiry_notes WHERE enquiry_id = ? ORDER BY created_at DESC'
+    )
+    .all(enquiryId) as {
+    id: string;
+    enquiry_id: string;
+    body: string;
+    created_at: string;
+  }[];
+  return rows.map((r) => ({
+    id: r.id,
+    enquiryId: r.enquiry_id,
+    body: r.body,
+    createdAt: r.created_at,
+  }));
+}
+
+/** How many notes each lead carries, for the list view. */
+export async function noteCounts(): Promise<Map<string, number>> {
+  const rows = getDb()
+    .prepare('SELECT enquiry_id, COUNT(*) AS n FROM enquiry_notes GROUP BY enquiry_id')
+    .all() as { enquiry_id: string; n: number }[];
+  return new Map(rows.map((r) => [r.enquiry_id, r.n]));
+}
+
+/**
+ * Records that the automatic thank-you has gone out. Its own narrow write, and
+ * guarded on the stamp still being null, so two imports racing the same new
+ * row cannot both message the client. Returns true only for the write that won.
+ */
+export async function markWelcomed(id: string): Promise<boolean> {
+  const result = getDb()
+    .prepare('UPDATE enquiries SET welcomed_at = ? WHERE id = ? AND welcomed_at IS NULL')
+    .run(new Date().toISOString(), id);
+  return Number(result.changes) > 0;
+}
+
+/** Look a lead up by its Meta lead-ad row id, to avoid importing it twice. */
+export async function getEnquiryByExternalId(
+  externalId: string
+): Promise<Enquiry | null> {
+  const row = getDb()
+    .prepare('SELECT * FROM enquiries WHERE external_id = ?')
+    .get(externalId) as Row | undefined;
+  return row ? toEnquiry(row) : null;
 }

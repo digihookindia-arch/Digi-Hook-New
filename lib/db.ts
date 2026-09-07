@@ -158,10 +158,29 @@ const SCHEMA = `
     answers       TEXT NOT NULL,
     summary       TEXT NOT NULL,
     status        TEXT NOT NULL DEFAULT 'new',
-    proposal_slug TEXT
+    proposal_slug TEXT,
+    source        TEXT NOT NULL DEFAULT 'website',
+    external_id   TEXT,
+    welcomed_at   TEXT
   );
+  CREATE UNIQUE INDEX IF NOT EXISTS enquiries_external
+    ON enquiries (external_id) WHERE external_id IS NOT NULL;
   CREATE INDEX IF NOT EXISTS enquiries_created_at ON enquiries (created_at DESC);
   CREATE INDEX IF NOT EXISTS enquiries_status ON enquiries (status);
+  /*
+   * A note the studio leaves against a lead: what was said on the call, what
+   * to try next. One row per note, never edited - a follow-up history that
+   * loses its earlier entries is not a history, and "I already told them
+   * that" is exactly what this exists to answer.
+   */
+  CREATE TABLE IF NOT EXISTS enquiry_notes (
+    id          TEXT PRIMARY KEY,
+    enquiry_id  TEXT NOT NULL,
+    body        TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS enquiry_notes_enquiry
+    ON enquiry_notes (enquiry_id, created_at DESC);
 
   /*
    * Leads from the /get-quote ad funnel. Separate from enquiries because the
@@ -615,6 +634,15 @@ export function getDb(): DatabaseSync {
     // empty invoice_email uses client_email.
     addColumnIfMissing(db, 'proposals', 'client_legal_name', "TEXT NOT NULL DEFAULT ''");
     addColumnIfMissing(db, 'proposals', 'invoice_email', "TEXT NOT NULL DEFAULT ''");
+    // Where a lead came from - the website form, the ads funnel, or a Meta
+    // lead-ad row imported from the studio's sheet. Rows written before this
+    // read back as 'website', which is what they all were.
+    addColumnIfMissing(db, 'enquiries', 'source', "TEXT NOT NULL DEFAULT 'website'");
+    // The Meta lead-ad row id, so re-importing the same sheet updates rather
+    // than duplicating. Null for everything that did not come from a sheet.
+    addColumnIfMissing(db, 'enquiries', 'external_id', 'TEXT');
+    // When the automatic thank-you went out, so it goes exactly once.
+    addColumnIfMissing(db, 'enquiries', 'welcomed_at', 'TEXT');
     global._dhSqlite = db;
   }
   return global._dhSqlite;

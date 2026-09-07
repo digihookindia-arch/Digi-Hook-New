@@ -35,6 +35,7 @@ export const CAMPAIGNS = {
   proposalAccepted: process.env.AISENSY_CAMPAIGN_PROPOSAL_ACCEPTED ?? '',
   paymentDue: process.env.AISENSY_CAMPAIGN_PAYMENT_DUE ?? '',
   paymentReceived: process.env.AISENSY_CAMPAIGN_PAYMENT_RECEIVED ?? '',
+  newLead: process.env.AISENSY_CAMPAIGN_NEW_LEAD ?? '',
 } as const;
 
 export type CampaignKey = keyof typeof CAMPAIGNS;

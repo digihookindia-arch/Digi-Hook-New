@@ -285,3 +285,59 @@ export function proposalAcceptedEmail(input: {
     }),
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* 0 · New lead — the automatic reply to a Meta lead-ad submission     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Sent the moment a lead-ad row reaches the system, before anyone has spoken
+ * to them. Numbered zero because it happens before stage 1: the enquiry email
+ * above answers a brief somebody wrote, and this answers a name and a phone
+ * number with no context at all.
+ *
+ * It ends in a question, deliberately. The studio has to ring and ask what the
+ * person actually wants regardless; asking here means some answer first, in
+ * writing, and the call starts from something rather than nothing.
+ *
+ * No step track: this is not on the four-stage proposal journey, and showing a
+ * sales pipeline to someone who has not spoken to anyone yet would be absurd.
+ */
+export function newLeadEmail(input: { name: string }): MilestoneMail {
+  return {
+    subject: 'Thanks for your enquiry — one quick question — Digi Hook',
+    body: [
+      `Hi ${firstName(input.name)},`,
+      '',
+      'Thank you for getting in touch with Digi Hook. We build websites, online',
+      'stores and industry platforms out of Noida.',
+      '',
+      'So we can be useful rather than generic on our first call — what are you',
+      'looking to build, and is there a site you already have?',
+      '',
+      'Just reply to this email, or message us on WhatsApp. Either way someone',
+      'will call you within one working day.',
+      ...signOff(),
+    ].join('\n'),
+    html: milestoneEmailHtml({
+      preheader:
+        'Thanks for your enquiry — tell us what you are looking to build and we will call within one working day.',
+      kicker: 'Enquiry received',
+      headline: 'Thanks for<br>getting in<br>touch.',
+      leadHeading: 'One quick question.',
+      leadBody:
+        'So we can be useful rather than generic on our first call — what are you looking to build, and is there a site you already have? Reply here or message us on WhatsApp, and someone will call you within one working day.',
+      detailLeftLabel: 'What happens next',
+      detailLeftValue: 'A call',
+      detailRightLabel: 'When',
+      detailRightValue: 'Within 1 working day',
+      ctaText: 'Reply on WhatsApp',
+      ctaHref: whatsappUrl('Hello Digi Hook, I am looking to build'),
+      secondaryLine:
+        `Or call us on <a href="tel:${site.phoneHref}" style="color:#b02510;text-decoration:underline;">${site.phoneDisplay}</a>. ` +
+        `We are open ${site.hoursLine}.`,
+      footerNote:
+        'You are receiving this because you enquired with Digi Hook. Reply to stop hearing from us.',
+    }),
+  };
+}
