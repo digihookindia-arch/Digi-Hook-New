@@ -211,6 +211,83 @@ export const work: WorkItem[] = [
     renderingNote:
       'Built once and served as finished files — nothing is assembled while a visitor waits.',
   },
+  /*
+   * The three entries below were measured on 2026-09-07 with the Lighthouse CLI
+   * (v12.8.2, its default mobile preset) rather than PageSpeed Insights, and the
+   * cards say so. PSI without an API key shares one anonymous quota with the
+   * whole internet and returned 429 on every attempt that day. A local run and a
+   * PSI run are not the same hardware and do not produce interchangeable
+   * numbers — which is precisely why \`source\` is printed beside every score.
+   * Re-measure these through PSI once \`PAGESPEED_API_KEY\` exists and change
+   * \`source\` back to 'PageSpeed Insights' in the same edit.
+   */
+  {
+    id: 'apnaheaven',
+    num: '04',
+    category: 'Real estate',
+    name: 'Apna Heaven',
+    domain: 'apnaheaven.com',
+    url: 'https://apnaheaven.com/',
+    blurb:
+      'A property consultancy’s site for Noida, Greater Noida and the Yamuna Expressway. A page per project, browsable by developer or by location, with an enquiry route on every one of them.',
+    shot: '/work/apnaheaven.webp',
+    shotAlt:
+      'Home page of apnaheaven.com — a dusk photograph of curved high-rise towers behind trees, with the heading “Apna Heaven” above buttons reading Explore Properties and Book a Consultation.',
+    scores: { performance: 85, accessibility: 95, bestPractices: 100, seo: 100 },
+    measured: '2026-09-07',
+    strategy: 'mobile',
+    source: 'Lighthouse',
+    tech: ['Next.js', 'React', 'Tailwind CSS', 'next/image', 'Nginx'],
+    rendering: 'SSR',
+    renderingNote:
+      'Assembled on the server for each visit, so a project that changes during the day is never served from yesterday’s copy.',
+  },
+  {
+    id: 'ramdelotraders',
+    num: '05',
+    category: 'Ecommerce',
+    name: 'Ramdelo Traders',
+    domain: 'ramdelotraders.com',
+    url: 'https://ramdelotraders.com/',
+    blurb:
+      'A spice and pantry storefront: nine categories, cart and checkout with payments taken through Razorpay, and a separate B2B portal for trade buyers.',
+    shot: '/work/ramdelotraders.webp',
+    shotAlt:
+      'Home page of ramdelotraders.com — a cream hero reading “Pure Ingredients, Authentic Teas” beside a photograph of a Bablu Channa tea pouch in an arched frame.',
+    // Performance is the outlier on this page, and it is published as measured.
+    // The catalogue home carries a lot of product photography above the fold;
+    // 71 is a fact about the page as it stands today, not a number to round up.
+    // Re-measure after any image work rather than editing it here.
+    scores: { performance: 71, accessibility: 98, bestPractices: 100, seo: 100 },
+    measured: '2026-09-07',
+    strategy: 'mobile',
+    source: 'Lighthouse',
+    tech: ['Next.js', 'React', 'Tailwind CSS', 'Razorpay', 'Nginx'],
+    rendering: 'ISR',
+    renderingNote:
+      'Pre-built and refreshed in the background on a five-minute window, so prices and stock move without a rebuild.',
+  },
+  {
+    id: 'therosadori',
+    num: '06',
+    category: 'Brand catalogue',
+    name: 'Rosa Dori',
+    domain: 'therosadori.com',
+    url: 'https://therosadori.com/',
+    blurb:
+      'A natural-fibre bag label’s catalogue, built for buyers rather than baskets: four collections, a sustainability section, and an enquiry as the only call to action.',
+    shot: '/work/therosadori.webp',
+    shotAlt:
+      'Home page of therosadori.com — a photograph of jute and cotton bags arranged on a terrace table above a lake, under the Rosa Dori wordmark.',
+    scores: { performance: 84, accessibility: 91, bestPractices: 96, seo: 92 },
+    measured: '2026-09-07',
+    strategy: 'mobile',
+    source: 'Lighthouse',
+    tech: ['Next.js', 'React', 'CSS Modules', 'next/image', 'Nginx'],
+    rendering: 'SSR',
+    renderingNote:
+      'Rendered on the server for each visit — the collections stay editable without a deploy behind them.',
+  },
 ];
 
 // The studio's own page scores are deliberately NOT published here (client's
@@ -226,7 +303,7 @@ export const work: WorkItem[] = [
  * so.** The brief asked for an eye-catching score animation up top that was not
  * any particular site's result. Inventing four impressive-looking numbers was
  * the one thing that could not happen here: the section immediately below hands
- * visitors three live URLs and dares them to re-run the audit, so a fabricated
+ * visitors six live URLs and dares them to re-run the audit, so a fabricated
  * set of rings above it would discredit the real ones by association — and
  * CLAUDE.md forbids invented performance statistics outright.
  *
@@ -246,9 +323,9 @@ export const standardBand = {
   // scores a website *needs*, not scores this studio has achieved, which is
   // what keeps it honest directly above three checkable client results.
   title: 'The Google scores every website needs.',
-  body: 'Google gives every website four scores out of 100. These are the numbers we build to — and the three live sites below show what they actually scored.',
+  body: 'Google gives every website four scores out of 100. These are the numbers we build to — and the six live sites below show what they actually scored.',
   scores: { performance: 95, accessibility: 99, bestPractices: 100, seo: 100 },
-  note: 'These are the targets every build is held to, not a measurement of any one site. Every real score on this page is labelled with the tool, the device and the date it was taken — the three live sites below are the receipts.',
+  note: 'These are the targets every build is held to, not a measurement of any one site. Every real score on this page is labelled with the tool, the device and the date it was taken — the live sites below are the receipts.',
 } as const;
 
 export const workSection = {
@@ -257,7 +334,7 @@ export const workSection = {
   // four pillars — that title pointed at them, so it could not survive the move.
   // Whatever goes here has to stand on its own as the first thing anyone reads.
   kicker: 'Proof, not promises',
-  title: 'Three live sites. Numbers you can check yourself.',
+  title: 'Six live sites. Numbers you can check yourself.',
   lead: 'Most agencies show you a portfolio. We show you the audit. Every site below is live and running — open it in the preview window and use it, then run it through Google PageSpeed Insights yourself and see whether you get what we published.',
   previewCta: 'Open live preview',
   previewHint: 'Click to open the live site',

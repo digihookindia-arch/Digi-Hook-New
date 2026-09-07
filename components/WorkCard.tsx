@@ -13,18 +13,28 @@ import { ScoreRow } from './ScoreRings';
  * One live client site: preview, scores, stack, link — and a popup that frames
  * the real running site rather than showing a picture of it.
  *
- * **The popup only works because the three client vhosts opt in.** Each sends
- * `Content-Security-Policy: frame-ancestors 'self' https://digihook.in`, added
- * 2026-08-13. Without it the box renders empty: CloudPanel's shared
+ * **The popup only works on client vhosts that opt in.** The site has to send
+ * `Content-Security-Policy: frame-ancestors 'self' https://digihook.in` —
+ * added to swarnikajewellers.in, totravelistolearn.in and 10penny.digihook.in
+ * on 2026-08-13. Without it the box renders empty: CloudPanel's shared
  * `/etc/nginx/global_settings` puts `X-Frame-Options: SAMEORIGIN` on every site
  * on the VPS, and frame-ancestors is what supersedes it in modern browsers.
  * If a preview ever goes blank, check that header on the client site first —
  * a CloudPanel update that rewrites the vhost will silently drop the line.
  *
+ * apnaheaven.com and therosadori.com got the same vhost line on 2026-09-07.
+ * **ramdelotraders.com is the exception: its header comes from the app, not
+ * nginx.** That site sets a full CSP in its own `next.config.ts`, and a second
+ * CSP from nginx cannot loosen the first — browsers enforce the intersection,
+ * so its `frame-ancestors 'none'` would have won. It was widened in the app
+ * config on the server (`/home/ramdelo/htdocs/ramdelo.digihook.in`) and
+ * rebuilt. Next.js bakes `headers()` into `.next/routes-manifest.json` at
+ * build time, so editing that config without a rebuild changes nothing.
+ *
  * The iframe is mounted only while the dialog is open, so a visitor who never
- * clicks pays nothing for it. That is the whole reason this is not three
+ * clicks pays nothing for it. That is the whole reason this is not six
  * always-mounted iframes: the page publishes a performance budget a few hundred
- * pixels up, and three live sites loading behind it would break the promise.
+ * pixels up, and six live sites loading behind it would break the promise.
  */
 
 /**

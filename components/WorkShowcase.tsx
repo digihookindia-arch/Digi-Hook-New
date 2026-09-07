@@ -7,7 +7,7 @@ import { WorkCard } from './WorkCard';
  *
  * Sits directly under the four pillars on Website Engineering: that block
  * claims performance, security, findability and scale, and this one hands the
- * visitor three live URLs to test the claim on. Stacked rather than tiled
+ * visitor six live URLs to test the claim on. Stacked rather than tiled
  * because a 440px thumbnail of a website is a logo with a colour scheme — at
  * full width you can actually read the page you are being sold.
  *
