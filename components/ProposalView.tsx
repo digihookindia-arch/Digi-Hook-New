@@ -84,30 +84,65 @@ function Panel({
   );
 }
 
-/** Column head for the document's tables. Sunk grey, not a black bar. */
-function Head({
-  columns,
-  minWidth,
-  lastRight,
+/**
+ * A row of the document's tables: columns side by side where there is room,
+ * stacked where there is not.
+ *
+ * These used to be fixed grids behind `overflow-x-auto` with a shared header
+ * row. On a phone that meant a 640px table inside a 375px screen — the page
+ * itself never scrolled sideways, but every table became its own little
+ * side-scroller, which reads as a broken page rather than a scrollable one.
+ *
+ * `auto-fit` with a `min(100%, …)` basis collapses them to one column when the
+ * space is not there, which is the house rule for every other grid on the site.
+ * The cost is the header row: a single row of labels cannot follow cells that
+ * reflow underneath it, so each cell carries its own label instead. That reads
+ * fine wide and is the only thing that reads at all narrow.
+ */
+function Row({
+  children,
+  last,
 }: {
-  columns: string[];
-  minWidth: string;
-  lastRight?: boolean;
+  children: React.ReactNode;
+  last?: boolean;
 }) {
   return (
     <div
-      className={`grid ${minWidth} border-b border-neutral-300 bg-surface text-[11px] font-semibold uppercase leading-none tracking-[0.14em] text-neutral-800`}
+      className={`grid grid-cols-[repeat(auto-fit,minmax(min(100%,170px),1fr))] gap-x-6 gap-y-4 px-5 py-4 ${
+        last ? '' : 'border-b border-neutral-200'
+      }`}
     >
-      {columns.map((column, i) => (
-        <div
-          key={column}
-          className={`px-5 py-3.5 ${
-            lastRight && i === columns.length - 1 ? 'text-right' : ''
-          }`}
-        >
-          {column}
-        </div>
-      ))}
+      {children}
+    </div>
+  );
+}
+
+/** One labelled value inside a `Row`. */
+function Cell({
+  label,
+  children,
+  tone = 'body',
+}: {
+  label: string;
+  children: React.ReactNode;
+  /** `lead` is the row's subject, `meta` a short uppercase attribute. */
+  tone?: 'body' | 'lead' | 'meta' | 'figure';
+}) {
+  const styles = {
+    body: 'text-[14px] leading-[1.6] text-neutral-800',
+    lead: 'font-heading text-[14.5px] font-bold leading-[1.35] tracking-[-0.015em]',
+    meta: 'text-[12.5px] font-semibold uppercase leading-[1.35] tracking-[0.08em] text-neutral-700',
+    figure: 'font-heading text-[15.5px] font-extrabold leading-none tracking-[-0.02em]',
+  }[tone];
+
+  return (
+    <div>
+      {/* neutral-700, not 600: at 10.5px this is normal-size text, and 600
+          measures 3.85:1 on the ground, which fails AA. */}
+      <div className="mb-1.5 text-[10.5px] font-semibold uppercase leading-none tracking-[0.12em] text-neutral-700">
+        {label}
+      </div>
+      <div className={styles}>{children}</div>
     </div>
   );
 }
@@ -142,13 +177,6 @@ export function ProposalView({
   const schedule = milestoneSchedule(content.total, milestones, gstPercent);
   const scheduleTotal = scheduleTotals(schedule);
 
-  const scopeCols = 'min-w-[560px] grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]';
-  const techCols =
-    'min-w-[600px] grid-cols-[minmax(0,0.55fr)_minmax(0,0.45fr)_minmax(0,1.5fr)]';
-  const payCols =
-    'min-w-[600px] grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,0.7fr)]';
-  const annexCols =
-    'min-w-[640px] grid-cols-[minmax(0,0.7fr)_minmax(0,1.15fr)_minmax(0,1.15fr)]';
 
   return (
     <article>
@@ -181,28 +209,17 @@ export function ProposalView({
         <Section number={next()} title="Technology" lead={content.technology.summary}>
           {content.technology.stack.length > 0 ? (
             <Panel>
-              <div className="overflow-x-auto">
-                <Head
-                  columns={['Technology', 'Role', 'What it means for you']}
-                  minWidth={techCols}
-                />
-                {content.technology.stack.map((t) => (
-                  <div
-                    key={t.name}
-                    className={`grid ${techCols} border-b border-neutral-200 last:border-b-0`}
-                  >
-                    <div className="px-5 py-4 font-heading text-[14.5px] font-bold leading-[1.3] tracking-[-0.015em]">
-                      {t.name}
-                    </div>
-                    <div className="px-5 py-4 text-[12.5px] font-semibold uppercase leading-[1.3] tracking-[0.08em] text-neutral-700">
-                      {t.role}
-                    </div>
-                    <div className="px-5 py-4 text-[14px] leading-[1.6] text-neutral-800">
-                      {t.why}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {content.technology.stack.map((t, i) => (
+                <Row key={t.name} last={i === content.technology!.stack.length - 1}>
+                  <Cell label="Technology" tone="lead">
+                    {t.name}
+                  </Cell>
+                  <Cell label="Role" tone="meta">
+                    {t.role}
+                  </Cell>
+                  <Cell label="What it means for you">{t.why}</Cell>
+                </Row>
+              ))}
             </Panel>
           ) : null}
         </Section>
@@ -211,22 +228,14 @@ export function ProposalView({
       {content.scope.length > 0 ? (
         <Section number={next()} title="What is included">
           <Panel>
-            <div className="overflow-x-auto">
-              <Head columns={['Item', 'Detail']} minWidth={scopeCols} />
-              {content.scope.map((s) => (
-                <div
-                  key={s.item}
-                  className={`grid ${scopeCols} border-b border-neutral-200 last:border-b-0`}
-                >
-                  <div className="px-5 py-4 font-heading text-[14.5px] font-bold leading-[1.3] tracking-[-0.015em]">
-                    {s.item}
-                  </div>
-                  <div className="px-5 py-4 text-[14.5px] leading-[1.6] text-neutral-800">
-                    {s.detail}
-                  </div>
-                </div>
-              ))}
-            </div>
+            {content.scope.map((s, i) => (
+              <Row key={s.item} last={i === content.scope.length - 1}>
+                <Cell label="Item" tone="lead">
+                  {s.item}
+                </Cell>
+                <Cell label="Detail">{s.detail}</Cell>
+              </Row>
+            ))}
           </Panel>
         </Section>
       ) : null}
@@ -339,69 +348,56 @@ export function ProposalView({
           lead="Payments are staged against the work, not taken up front. Each one is invoiced when it falls due, and can be paid online from the Payment stage once this proposal is accepted."
         >
           <Panel>
-            <div className="overflow-x-auto">
-              <Head
-                columns={['Payment', 'When it is due', 'Payable']}
-                minWidth={payCols}
-                lastRight
-              />
-              {schedule.map((row) => (
-                <div
-                  key={`${row.milestone.label}-${row.index}`}
-                  className={`grid ${payCols} border-b border-neutral-200`}
-                >
-                  <div className="px-5 py-4 font-heading text-[14.5px] font-bold leading-[1.3] tracking-[-0.015em]">
-                    {row.milestone.label}
-                  </div>
-                  <div className="px-5 py-4 text-[14px] leading-[1.6] text-neutral-800">
-                    {row.milestone.note || MILESTONE_LABELS[row.milestone.status]}
-                  </div>
-                  <div className="px-5 py-4 text-right">
-                    {row.payableText ? (
-                      <div className="font-heading text-[15.5px] font-extrabold leading-none tracking-[-0.02em]">
-                        {row.payableText}
-                      </div>
-                    ) : null}
-                    {/* The payable figure leads, because that is the number
-                        that leaves the client's account. Its two parts sit
-                        under it so nobody has to reverse-engineer the tax. */}
-                    {row.subtotalText && row.gstText ? (
-                      <div className="mt-1.5 text-[12.5px] leading-[1.45] text-neutral-700">
-                        {row.subtotalText} + {row.gstText} GST
-                      </div>
-                    ) : null}
-                    {/* A rupee figure fixed against a range total has no
-                        honest share to print — hide the 0% rather than show
-                        one. */}
-                    {row.milestone.percent > 0 ? (
-                      <div className="mt-1 text-[12px] font-semibold uppercase leading-none tracking-[0.08em] text-neutral-700">
-                        {row.milestone.percent}% of project
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-              {scheduleTotal ? (
-                <div className={`grid ${payCols} bg-surface`}>
-                  <div className="px-5 py-4 font-heading text-[15px] font-extrabold leading-none tracking-[-0.02em]">
-                    Total
-                  </div>
-                  <div className="px-5 py-4 text-[13.5px] leading-[1.5] text-neutral-700">
+            {schedule.map((row, i) => (
+              <Row
+                key={`${row.milestone.label}-${row.index}`}
+                last={!scheduleTotal && i === schedule.length - 1}
+              >
+                <Cell label="Payment" tone="lead">
+                  {row.milestone.label}
+                </Cell>
+                <Cell label="When it is due">
+                  {row.milestone.note || MILESTONE_LABELS[row.milestone.status]}
+                </Cell>
+                <Cell label="Payable" tone="figure">
+                  {row.payableText ?? '—'}
+                  {/* The payable figure leads, because that is the number that
+                      leaves the client's account. Its two parts sit under it so
+                      nobody has to reverse-engineer the tax. */}
+                  {row.subtotalText && row.gstText ? (
+                    <span className="mt-1.5 block text-[12.5px] font-normal leading-[1.45] tracking-normal text-neutral-700">
+                      {row.subtotalText} + {row.gstText} GST
+                    </span>
+                  ) : null}
+                  {/* A rupee figure fixed against a range total has no honest
+                      share to print — hide the 0% rather than show one. */}
+                  {row.milestone.percent > 0 ? (
+                    <span className="mt-1 block text-[12px] font-semibold uppercase leading-none tracking-[0.08em] text-neutral-700">
+                      {row.milestone.percent}% of project
+                    </span>
+                  ) : null}
+                </Cell>
+              </Row>
+            ))}
+            {scheduleTotal ? (
+              <div className="bg-surface">
+                <Row last>
+                  <Cell label="Total" tone="lead">
                     Across {schedule.length}{' '}
                     {schedule.length === 1 ? 'payment' : 'payments'}
-                  </div>
-                  <div className="px-5 py-4 text-right">
-                    <div className="font-heading text-[17px] font-extrabold leading-none tracking-[-0.025em] text-accent-700">
+                  </Cell>
+                  <Cell label="Quoted">
+                    {formatInr(scheduleTotal.subtotal)} +{' '}
+                    {formatInr(scheduleTotal.gst)} GST
+                  </Cell>
+                  <Cell label="Total payable" tone="figure">
+                    <span className="text-accent-700">
                       {formatInr(scheduleTotal.payable)}
-                    </div>
-                    <div className="mt-1.5 text-[12.5px] leading-[1.45] text-neutral-700">
-                      {formatInr(scheduleTotal.subtotal)} +{' '}
-                      {formatInr(scheduleTotal.gst)} GST
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
+                    </span>
+                  </Cell>
+                </Row>
+              </div>
+            ) : null}
           </Panel>
           <p className="m-0 mt-4 max-w-[64ch] text-[13.5px] leading-[1.65] text-neutral-700">
             Each payment is shown as the quoted share plus GST at {gstPercent}%.{' '}
@@ -430,28 +426,15 @@ export function ProposalView({
                   </p>
                 ) : null}
                 <Panel className="mt-3">
-                  <div className="overflow-x-auto">
-                    <Head
-                      columns={['Feature', 'What it is', 'Why it matters']}
-                      minWidth={annexCols}
-                    />
-                    {table.rows.map((row) => (
-                      <div
-                        key={row.feature}
-                        className={`grid ${annexCols} border-b border-neutral-200 last:border-b-0`}
-                      >
-                        <div className="px-5 py-4 font-heading text-[14px] font-bold leading-[1.3] tracking-[-0.015em]">
-                          {row.feature}
-                        </div>
-                        <div className="px-5 py-4 text-[14px] leading-[1.6] text-neutral-800">
-                          {row.what}
-                        </div>
-                        <div className="px-5 py-4 text-[14px] leading-[1.6] text-neutral-800">
-                          {row.why}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  {table.rows.map((row, i) => (
+                    <Row key={row.feature} last={i === table.rows.length - 1}>
+                      <Cell label="Feature" tone="lead">
+                        {row.feature}
+                      </Cell>
+                      <Cell label="What it is">{row.what}</Cell>
+                      <Cell label="Why it matters">{row.why}</Cell>
+                    </Row>
+                  ))}
                 </Panel>
               </div>
             ))}

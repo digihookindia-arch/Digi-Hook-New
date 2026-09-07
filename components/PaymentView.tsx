@@ -62,6 +62,39 @@ function StatusPill({ state }: { state: DueState }) {
   );
 }
 
+/**
+ * One labelled value in a reflowing row. Twin of the proposal document's
+ * `Cell` — the two views sit one click apart and must label money the same way.
+ */
+function Cell({
+  label,
+  children,
+  tone = 'body',
+}: {
+  label: string;
+  children: React.ReactNode;
+  tone?: 'body' | 'figure';
+}) {
+  return (
+    <div>
+      {/* neutral-700, not 600: at 10.5px this is normal-size text, where 600
+          measures 3.85:1 on the ground and fails AA. */}
+      <div className="mb-1.5 text-[10.5px] font-semibold uppercase leading-none tracking-[0.12em] text-neutral-700">
+        {label}
+      </div>
+      <div
+        className={
+          tone === 'figure'
+            ? 'font-heading text-[15px] font-extrabold leading-none tracking-[-0.02em]'
+            : 'text-[14px] leading-[1.55] text-neutral-800'
+        }
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /** One figure in the summary band. */
 function Figure({
   label,
@@ -412,55 +445,46 @@ export function PaymentView({
             Payments received
           </h3>
           <div className="overflow-hidden rounded-panel bg-panel shadow-panel">
-            <div className="overflow-x-auto">
-              <div className="grid min-w-[620px] grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.6fr)] border-b border-neutral-300 bg-surface text-[11px] font-semibold uppercase leading-none tracking-[0.14em] text-neutral-800">
-                <div className="px-5 py-3.5">Date</div>
-                <div className="px-5 py-3.5">Tax invoice</div>
-                <div className="px-5 py-3.5">Payment</div>
-                <div className="px-5 py-3.5 text-right">Amount</div>
-              </div>
-              {receipts.map((payment) => {
-                const invoice = invoiceFor(payment);
-                return (
-                  <div
-                    key={payment.id}
-                    className="grid min-w-[620px] grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.6fr)] border-b border-neutral-200 last:border-b-0"
-                  >
-                    <div className="px-5 py-4 text-[14px] leading-[1.5] text-neutral-800">
-                      {formatDocDate(payment.paidAt ?? payment.createdAt)}
-                    </div>
-                    <div className="px-5 py-4">
-                      {invoice ? (
-                        <a
-                          href={`/proposals/${slug}/payment/invoice/${invoice.id}`}
-                          className="font-heading text-[13.5px] font-bold leading-[1.35] tracking-[-0.01em] text-accent-700 underline underline-offset-4"
-                        >
-                          {invoice.number}
-                        </a>
-                      ) : (
-                        <span className="text-[13.5px] leading-[1.4] text-neutral-700">
-                          Receipt {payment.receipt}
-                          <span className="mt-1 block text-[12px] text-neutral-600">
-                            Invoice to follow
-                          </span>
+            {receipts.map((payment, i) => {
+              const invoice = invoiceFor(payment);
+              return (
+                <div
+                  key={payment.id}
+                  className={`grid grid-cols-[repeat(auto-fit,minmax(min(100%,170px),1fr))] gap-x-6 gap-y-4 px-5 py-4 ${
+                    i === receipts.length - 1 ? '' : 'border-b border-neutral-200'
+                  }`}
+                >
+                  <Cell label="Date">
+                    {formatDocDate(payment.paidAt ?? payment.createdAt)}
+                  </Cell>
+                  <Cell label="Tax invoice">
+                    {invoice ? (
+                      <a
+                        href={`/proposals/${slug}/payment/invoice/${invoice.id}`}
+                        className="font-heading text-[13.5px] font-bold leading-[1.35] tracking-[-0.01em] text-accent-700 underline underline-offset-4"
+                      >
+                        {invoice.number}
+                      </a>
+                    ) : (
+                      <>
+                        Receipt {payment.receipt}
+                        {/* neutral-700, not 600: 600 fails AA at this size. */}
+                        <span className="mt-1 block text-[12px] text-neutral-700">
+                          Invoice to follow
                         </span>
-                      )}
-                    </div>
-                    <div className="px-5 py-4 text-[14px] leading-[1.5] text-neutral-800">
-                      {payment.milestoneLabel}
-                    </div>
-                    <div className="px-5 py-4 text-right">
-                      <div className="font-heading text-[15px] font-extrabold leading-none tracking-[-0.02em]">
-                        {formatInr(payment.amountInr)}
-                      </div>
-                      <div className="mt-1 text-[12.5px] leading-[1.45] text-neutral-700">
-                        incl. {formatInr(payment.gstInr)} GST
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                      </>
+                    )}
+                  </Cell>
+                  <Cell label="Payment">{payment.milestoneLabel}</Cell>
+                  <Cell label="Amount" tone="figure">
+                    {formatInr(payment.amountInr)}
+                    <span className="mt-1 block text-[12.5px] font-normal leading-[1.45] tracking-normal text-neutral-700">
+                      incl. {formatInr(payment.gstInr)} GST
+                    </span>
+                  </Cell>
+                </div>
+              );
+            })}
           </div>
           <p className="m-0 mt-4 text-[13.5px] leading-[1.6] text-neutral-700">
             {formatInr(collectedInr(payments))} received online across{' '}
