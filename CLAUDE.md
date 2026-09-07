@@ -602,6 +602,45 @@ ticket-plus-first-message).
     Lighthouse tones exist in the tokens precisely so those scores match
     Google's own widget. Rank sparklines invert their axis (rank 1 at the
     top) and plot "not in top 100" on the floor with a 100+ tooltip.
+
+### WhatsApp (AiSensy)
+
+Four client messages — proposal ready, proposal accepted, payment due, payment
+received. Email still carries the detail and the invoice PDF; WhatsApp carries
+the fact and a link.
+
+**AiSensy sends campaigns, not templates.** A template is written there,
+approved by Meta, attached to an API campaign and set live; `lib/whatsapp.ts`
+then names that campaign. Campaign names therefore live in the environment —
+only the studio knows what they called them, and a name that does not exist
+fails at send time with no way for the code to know sooner. Missing API key, or
+a missing name for one message, leaves that message dormant and logged, the
+SMTP and Razorpay rule.
+
+**`templateParams` fills `{{1}} {{2}} {{3}}` positionally.** No names, no keys,
+nothing at runtime to catch a transposition — swap two and a client is messaged
+an amount where their name should be. `lib/whatsappMessages.ts` is the only
+place that order is written down, each builder prints the template it matches,
+and `lib/phone.test.ts` pins every position. **Change a template in AiSensy and
+the builder must change in the same pass.**
+
+**`lib/phone.ts` returns null rather than guessing.** The stored numbers were
+typed by hand over months, in every shape. Ten digits gains `91`, a leading
+zero is dropped, an explicit `+` is trusted; a landline with an unknown STD
+code, eleven digits with no leading zero, or an Indian mobile starting 5 all
+resolve to nothing and the send is skipped. Sending a client's project link to
+a stranger is worse than sending nothing. The dashboard warns when a number is
+present but unusable — worse than absent, because it looks filled in.
+
+**Payment reminders send once, on the day a payment first falls due**, and one
+message per proposal naming the total due rather than one per overdue
+milestone. A client a fortnight behind needs a phone call, not a fourteenth
+message; nagging daily is how a business number gets blocked, and a blocked
+number cannot deliver the invoices either. `/api/cron/payment-reminders`,
+**crontab 05:00 UTC = 10:30 IST** — deliberately not with the 03:xx jobs, which
+are email and data only. A WhatsApp message at half past eight in the morning
+is a different thing from an email at the same hour.
+
 - **Renewal reminders**: `/api/cron/reminders` (daily VPS crontab, guarded by
   `CRON_SECRET` — unset = route plays dead) sends 30/15/7/1-day and at-expiry
   emails for both windows. One send per band per window end-date
