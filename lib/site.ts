@@ -130,11 +130,11 @@ export const site = {
    * the one property the rule exists to guarantee. And the studio's own books
    * must open at the same figure, or the accounts and the invoices disagree.
    *
-   * TODO(client): confirm the opening number with the CA before the first live
-   * invoice. It is a presentational choice, not a compliance one, but it is
-   * theirs to make and it cannot be walked back once an invoice carries it.
+   * Set to 59 by the client on 2026-09-07, so 26-27 opens at DH/26-27/0059.
+   * Worth mentioning to the CA so the books open at the same figure, but it is
+   * a presentational choice rather than a compliance one.
    */
-  invoiceSequenceStart: 1,
+  invoiceSequenceStart: 59,
 
   builtWith: 'Engineered in Next.js, TypeScript and Tailwind CSS.',
 } as const;
