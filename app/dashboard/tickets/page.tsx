@@ -9,6 +9,7 @@ import {
 import { getProject } from '@/lib/portalProjects';
 import { isDbConfigured, dbFile } from '@/lib/db';
 import { requireSession, signOut } from '../actions';
+import { istDate } from '@/lib/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,7 +102,7 @@ export default async function TicketsAdminPage() {
                       {project ? project.businessName : 'project removed'} ·{' '}
                       {TICKET_KIND_LABELS[ticket.kind]} ·{' '}
                       {PRIORITY_SHORT[ticket.priority]} ·{' '}
-                      {new Date(ticket.createdAt).toLocaleDateString('en-IN')}
+                      {istDate(ticket.createdAt)}
                       {ticket.quotedAt && !ticket.approvedAt && ticket.status !== 'closed'
                         ? ' · quote sent, awaiting client'
                         : ''}

@@ -248,10 +248,14 @@ export function renewalReminderEmail(input: {
   const when = ended
     ? 'has ended'
     : `ends in ${input.daysLeft} ${input.daysLeft === 1 ? 'day' : 'days'}`;
+  // endsOn is a plain date from lib/support.ts, built at UTC midnight, so it
+  // is read back the same way. Without the zone the renewal email would name a
+  // different day depending on where the server happens to be running.
   const endDate = new Date(input.endsOn).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    timeZone: 'UTC',
   });
   const next =
     input.kind === 'support'

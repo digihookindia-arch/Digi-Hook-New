@@ -1,12 +1,9 @@
 import { supportState } from '@/lib/support';
 import type { PortalProject } from '@/lib/portalProjects';
+import { onDate } from '@/lib/when';
 
 function displayDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  return onDate(iso);
 }
 
 /**

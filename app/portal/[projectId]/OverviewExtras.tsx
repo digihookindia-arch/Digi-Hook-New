@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import type { ActivityItem } from '@/lib/tickets';
 import { TICKET_KIND_LABELS } from '@/lib/ticketRules';
 import { shortReference } from '@/lib/emailTemplate';
+import { istDate } from '@/lib/when';
 
 /**
  * The overview's smaller server-rendered pieces: the pending-actions strip
@@ -88,10 +89,7 @@ export function ActivityFeed({
               </span>
             </span>
             <span className="text-[12.5px] leading-none text-neutral-700">
-              {new Date(item.at).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-              })}
+              {istDate(item.at)}
             </span>
           </Link>
         ))}

@@ -43,6 +43,7 @@ import { ActivityForm } from './ActivityForm';
 import { AuditDetail } from './AuditDetail';
 import { KeywordForm } from './KeywordForm';
 import { GenerateReportForm, ReportEditor } from './ReportTools';
+import { istDate, istDateTime, onDate } from '@/lib/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -129,15 +130,15 @@ export default async function SeoAdminPage({
               {!audit
                 ? 'none yet.'
                 : audit.status === 'running'
-                  ? `running since ${new Date(audit.startedAt).toLocaleString('en-IN')} — refresh in a minute.`
+                  ? `running since ${istDateTime(audit.startedAt)} — refresh in a minute.`
                   : audit.status === 'failed'
-                    ? `last attempt failed (${new Date(audit.startedAt).toLocaleDateString('en-IN')}) — check the server log.`
-                    : `${new Date(audit.startedAt).toLocaleDateString('en-IN')} · ${audit.pages} pages · ${audit.errors} critical, ${audit.warnings} warnings, ${audit.notices} notices.`}
+                    ? `last attempt failed (${istDate(audit.startedAt)}) — check the server log.`
+                    : `${istDate(audit.startedAt)} · ${audit.pages} pages · ${audit.errors} critical, ${audit.warnings} warnings, ${audit.notices} notices.`}
             </div>
             <div>
               <span className="font-semibold">PageSpeed:</span>{' '}
               {psi
-                ? `measured ${new Date(psi.fetchedAt).toLocaleString('en-IN')} · SEO ${psi.scores.seo ?? '—'} · performance ${psi.scores.performance ?? '—'}.`
+                ? `measured ${istDateTime(psi.fetchedAt)} · SEO ${psi.scores.seo ?? '—'} · performance ${psi.scores.performance ?? '—'}.`
                 : 'no measurement yet — the daily cron or the button below takes one.'}
             </div>
             <div>
@@ -148,11 +149,11 @@ export default async function SeoAdminPage({
                 <>
                   connected · this month&apos;s spend ${spend.toFixed(2)} ·{' '}
                   {standing
-                    ? `standing checked ${new Date(standing.checkedOn).toLocaleDateString('en-IN')}`
+                    ? `standing checked ${onDate(standing.checkedOn)}`
                     : 'standing not checked yet'}{' '}
                   ·{' '}
                   {offpage[0]
-                    ? `backlinks checked ${new Date(offpage[0].checkedOn).toLocaleDateString('en-IN')}.`
+                    ? `backlinks checked ${onDate(offpage[0].checkedOn)}.`
                     : 'backlinks not checked yet.'}
                 </>
               )}
@@ -302,11 +303,7 @@ export default async function SeoAdminPage({
                     {SEO_CATEGORY_LABELS[activity.category]}
                   </span>
                   <span className="text-[12.5px] leading-none text-neutral-700">
-                    {new Date(activity.happenedOn).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
+                    {onDate(activity.happenedOn)}
                   </span>
                 </div>
                 <div className="text-[14.5px] font-semibold leading-[1.5]">{activity.work}</div>
@@ -391,7 +388,7 @@ export default async function SeoAdminPage({
                     ) : null}
                     {deliverable.status === 'done' && deliverable.doneAt ? (
                       <span className="ml-2 font-normal text-neutral-700">
-                        done {new Date(deliverable.doneAt).toLocaleDateString('en-IN')}
+                        done {istDate(deliverable.doneAt)}
                       </span>
                     ) : null}
                   </span>
@@ -459,7 +456,7 @@ export default async function SeoAdminPage({
                     </span>
                   </h3>
                   <span className="text-[12.5px] leading-none text-neutral-700">
-                    data gathered {new Date(report.generatedAt).toLocaleDateString('en-IN')}
+                    data gathered {istDate(report.generatedAt)}
                   </span>
                 </div>
 
@@ -478,7 +475,7 @@ export default async function SeoAdminPage({
                     <span className="text-[13px] leading-none text-neutral-700">
                       published{' '}
                       {report.publishedAt
-                        ? new Date(report.publishedAt).toLocaleDateString('en-IN')
+                        ? istDate(report.publishedAt)
                         : ''}
                       · immutable
                     </span>

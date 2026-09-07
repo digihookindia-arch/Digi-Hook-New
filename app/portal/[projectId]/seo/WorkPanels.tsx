@@ -12,6 +12,7 @@ import {
   listPublishedReports,
 } from '@/lib/seoRecords';
 import type { PortalProject } from '@/lib/portalProjects';
+import { istDate, onDate } from '@/lib/when';
 
 /**
  * The client's view of the work record: agreed deliverables and where each
@@ -91,11 +92,7 @@ export async function ActivityPanel({ project }: { project: PortalProject }) {
                 {SEO_CATEGORY_LABELS[activity.category]}
               </span>
               <span className="text-[12.5px] leading-none text-neutral-700">
-                {new Date(activity.happenedOn).toLocaleDateString('en-IN', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })}
+                {onDate(activity.happenedOn)}
               </span>
             </div>
             <div className="text-[14.5px] font-semibold leading-[1.5]">{activity.work}</div>
@@ -144,7 +141,7 @@ export async function ReportsPanel({ project }: { project: PortalProject }) {
             <span className="inline-flex items-center gap-1.5 text-[13px] leading-none text-neutral-700">
               published{' '}
               {report.publishedAt
-                ? new Date(report.publishedAt).toLocaleDateString('en-IN')
+                ? istDate(report.publishedAt)
                 : ''}
               <ArrowRight
                 size={14}

@@ -3,6 +3,7 @@ import type { Invoice } from '@/lib/invoices';
 import { formatInr } from '@/lib/money';
 import { isReachable } from '@/lib/phone';
 import { IssueInvoiceButton } from './IssueInvoiceButton';
+import { istDate, istDateTime } from '@/lib/when';
 
 /**
  * The studio's view of the payment ledger — every attempt, not only the
@@ -134,13 +135,7 @@ export function PaymentsLedger({
                 className="grid min-w-[860px] grid-cols-[minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_minmax(0,0.7fr)] border-b border-neutral-300"
               >
                 <div className="px-4 py-4 text-[13.5px] leading-[1.5] text-neutral-800">
-                  {new Date(payment.createdAt).toLocaleString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {istDateTime(payment.createdAt)}
                 </div>
                 <div className="border-l border-neutral-300 px-4 py-4 font-heading text-[13px] font-bold leading-[1.35] tracking-[-0.01em]">
                   {payment.receipt}
@@ -189,7 +184,7 @@ export function PaymentsLedger({
                       {invoice.emailedAt ? (
                         <div className="mt-1 text-[12px] leading-[1.4] text-neutral-700">
                           Emailed{' '}
-                          {new Date(invoice.emailedAt).toLocaleDateString('en-IN')}
+                          {istDate(invoice.emailedAt)}
                         </div>
                       ) : (
                         <div className="mt-2">

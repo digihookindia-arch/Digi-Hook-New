@@ -24,6 +24,7 @@ import {
 import { ReviseForm } from './ReviseForm';
 import { ProposalContentEditor } from './ProposalContentEditor';
 import { DeliveryEditor } from './DeliveryEditor';
+import { istDate, istDateTime } from '@/lib/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +67,7 @@ export default async function EditProposalPage({
             </h1>
             <div className="text-[13.5px] leading-[1.5] text-neutral-700">
               {proposal.client} · updated{' '}
-              {new Date(proposal.updatedAt).toLocaleString('en-IN')}
+              {istDateTime(proposal.updatedAt)}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -121,7 +122,7 @@ export default async function EditProposalPage({
             {proposal.acceptedAt ? (
               <>
                 <span className="text-[13.5px] font-semibold leading-none text-accent-700">
-                  Accepted {new Date(proposal.acceptedAt).toLocaleDateString('en-IN')}
+                  Accepted {istDate(proposal.acceptedAt)}
                 </span>
                 <form action={setAcceptedAction}>
                   <input type="hidden" name="slug" value={proposal.slug} />

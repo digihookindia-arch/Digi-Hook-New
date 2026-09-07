@@ -6,6 +6,7 @@ import {
 import type { PortalProject } from '@/lib/portalProjects';
 import { displayDate, pathOf, pct, RowsTable, Stat } from './bits';
 import { Columns, Delta } from './charts';
+import { istDateTime } from '@/lib/when';
 
 /**
  * Search performance as an analyst would read it: a KPI row with movement
@@ -55,12 +56,7 @@ export async function SearchPerformancePanel({ project }: { project: PortalProje
       Source: Google Search Console · {displayDate(data.period.from)} –{' '}
       {displayDate(data.period.to)} vs the {SEARCH_WINDOW_DAYS} days before ·
       Google publishes a few days behind · synced{' '}
-      {new Date(data.fetchedAt).toLocaleString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-      })}
+      {istDateTime(data.fetchedAt)}
       .
     </p>
   );

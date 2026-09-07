@@ -12,6 +12,7 @@ import {
 import { formatInr } from '@/lib/delivery';
 import { shortReference } from '@/lib/emailTemplate';
 import { approveQuoteAction } from '../actions';
+import { istDate } from '@/lib/when';
 
 /**
  * Server-rendered pieces shared by the tickets and feature-request tabs and
@@ -50,11 +51,7 @@ export function OutOfSupportPill() {
 }
 
 export function displayDateTime(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return istDate(iso);
 }
 
 export function TicketList({

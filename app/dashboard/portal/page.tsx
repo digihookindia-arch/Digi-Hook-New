@@ -5,6 +5,7 @@ import { supportState } from '@/lib/support';
 import { isDbConfigured, dbFile } from '@/lib/db';
 import { requireSession, signOut } from '../actions';
 import { AddClientForm } from './AddClientForm';
+import { istDate } from '@/lib/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,7 +93,7 @@ export default async function PortalClientsPage() {
                     </span>
                     <span className="mt-1.5 block text-[13.5px] leading-[1.5] text-neutral-700">
                       {client ? client.email : 'account missing'} ·{' '}
-                      {new Date(project.createdAt).toLocaleDateString('en-IN')}
+                      {istDate(project.createdAt)}
                     </span>
                   </span>
                   <span className="flex flex-none items-center gap-2.5">

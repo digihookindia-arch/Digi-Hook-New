@@ -7,6 +7,7 @@ import { ticketsAwaitingStudioCount } from '@/lib/tickets';
 import { isDbConfigured, dbFile } from '@/lib/db';
 import { isClaudeConfigured } from '@/lib/claude';
 import { requireSession, removeProposal, signOut } from './actions';
+import { istDate } from '@/lib/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,7 +127,7 @@ export default async function DashboardPage() {
                     {p.content.title}
                   </Link>
                   <div className="mt-1.5 text-[13.5px] leading-[1.5] text-neutral-700">
-                    {p.client} · {new Date(p.createdAt).toLocaleDateString('en-IN')} ·
+                    {p.client} · {istDate(p.createdAt)} ·
                     access code <span className="font-heading font-bold">{p.accessCode}</span>
                   </div>
                 </div>

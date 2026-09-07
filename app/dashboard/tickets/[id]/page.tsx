@@ -18,6 +18,7 @@ import { setQuotePaidAction, setTicketStatusAction } from '../actions';
 import { StudioReplyForm } from './StudioReplyForm';
 import { QuoteForm } from './QuoteForm';
 import { AttachmentLinks } from '../../../portal/[projectId]/TicketBits';
+import { istDate, istDateTime } from '@/lib/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,7 +91,7 @@ export default async function TicketAdminPage({
               ) : (
                 'account removed'
               )}{' '}
-              · {new Date(ticket.createdAt).toLocaleString('en-IN')}
+              · {istDateTime(ticket.createdAt)}
             </div>
           </div>
 
@@ -141,9 +142,9 @@ export default async function TicketAdminPage({
                   <strong className="font-semibold text-text">
                     {ticket.quoteInr !== null ? formatInr(ticket.quoteInr) : '—'} + GST
                   </strong>{' '}
-                  on {new Date(ticket.quotedAt).toLocaleDateString('en-IN')} ·{' '}
+                  on {istDate(ticket.quotedAt)} ·{' '}
                   {ticket.approvedAt
-                    ? `approved by the client on ${new Date(ticket.approvedAt).toLocaleDateString('en-IN')}`
+                    ? `approved by the client on ${istDate(ticket.approvedAt)}`
                     : 'awaiting the client'}
                   {ticket.quotePaidAt ? ' · PAID' : ''}
                 </p>
@@ -184,7 +185,7 @@ export default async function TicketAdminPage({
                     : 'Digi Hook'}
                 </span>
                 <span className="text-[12.5px] leading-none text-neutral-700">
-                  {new Date(message.createdAt).toLocaleString('en-IN')}
+                  {istDateTime(message.createdAt)}
                 </span>
               </div>
               <p className="m-0 whitespace-pre-wrap text-[15px] leading-[1.65] text-neutral-800">

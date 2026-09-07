@@ -16,6 +16,7 @@ import {
 } from '../actions';
 import { ProjectEditor } from './ProjectEditor';
 import { UploadDocumentForm } from './UploadDocumentForm';
+import { istDate } from '@/lib/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,7 +145,7 @@ export default async function PortalProjectAdminPage({
                   </span>
                   <span className="mt-1 block text-[13px] leading-none text-neutral-700">
                     {TICKET_KIND_LABELS[ticket.kind]} ·{' '}
-                    {new Date(ticket.createdAt).toLocaleDateString('en-IN')}
+                    {istDate(ticket.createdAt)}
                   </span>
                 </span>
                 <span className="text-[13px] font-semibold uppercase leading-none tracking-[0.06em] text-neutral-700">
@@ -218,7 +219,7 @@ export default async function PortalProjectAdminPage({
                   ? 'running now.'
                   : audit.status === 'failed'
                     ? 'failed — see the SEO page.'
-                    : `${new Date(audit.startedAt).toLocaleDateString('en-IN')} · ${audit.pages} pages · ${audit.errors} critical, ${audit.warnings} warnings, ${audit.notices} notices.`}
+                    : `${istDate(audit.startedAt)} · ${audit.pages} pages · ${audit.errors} critical, ${audit.warnings} warnings, ${audit.notices} notices.`}
             </div>
             <Link
               href={`/dashboard/portal/${project.id}/seo`}

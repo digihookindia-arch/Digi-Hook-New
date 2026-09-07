@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Check, Eye, MessageCircle, Send } from 'lucide-react';
 import type { MilestoneRow } from '@/lib/journey';
+import { istShort } from '@/lib/when';
 
 /**
  * The four client-facing milestones for one enquiry, with what has been sent
@@ -13,15 +14,8 @@ import type { MilestoneRow } from '@/lib/journey';
  * send must stay possible, just never accidental.
  */
 
-const dateFormat = new Intl.DateTimeFormat('en-IN', {
-  day: 'numeric',
-  month: 'short',
-  hour: 'numeric',
-  minute: '2-digit',
-});
-
 function when(iso: string): string {
-  return dateFormat.format(new Date(iso));
+  return istShort(iso);
 }
 
 /**

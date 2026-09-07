@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { FileText } from 'lucide-react';
 import { listDocuments } from '@/lib/documents';
 import { portalProject } from '../../actions';
+import { istDate } from '@/lib/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,11 +64,7 @@ export default async function DocumentsPage({
                 </span>
               </span>
               <span className="text-[12.5px] leading-none text-neutral-700">
-                {new Date(doc.createdAt).toLocaleDateString('en-IN', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })}
+                {istDate(doc.createdAt)}
               </span>
             </a>
           ))}

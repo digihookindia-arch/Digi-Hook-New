@@ -10,6 +10,7 @@ import {
 import { portalProject } from '../../../../actions';
 import { pathOf, pct, RowsTable, Stat } from '../../bits';
 import { Delta, SEVERITY_CHART, StackedBar } from '../../charts';
+import { istDate, onDate } from '@/lib/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,18 +58,10 @@ export default async function SeoReportPage({
         <p className="m-0 mt-2 text-[13px] leading-[1.6] text-neutral-700">
           Published{' '}
           {report.publishedAt
-            ? new Date(report.publishedAt).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })
+            ? istDate(report.publishedAt)
             : ''}{' '}
           · the figures are frozen as gathered on{' '}
-          {new Date(report.generatedAt).toLocaleDateString('en-IN', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          })}
+          {istDate(report.generatedAt)}
           .
         </p>
       </div>
@@ -245,11 +238,7 @@ export default async function SeoReportPage({
             ) : null}
             <p className="m-0 mt-4 text-[12.5px] leading-[1.6] text-neutral-700">
               Source: Digi Hook&apos;s own crawler · site as checked on{' '}
-              {new Date(data.audit.checkedAt).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              })}
+              {istDate(data.audit.checkedAt)}
               .
             </p>
           </>
@@ -350,10 +339,7 @@ export default async function SeoReportPage({
                     {SEO_CATEGORY_LABELS[activity.category]}
                   </span>
                   <span className="text-[12.5px] leading-none text-neutral-700">
-                    {new Date(activity.happenedOn).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                    })}
+                    {onDate(activity.happenedOn)}
                   </span>
                 </div>
                 <div className="text-[14.5px] font-semibold leading-[1.5]">{activity.work}</div>

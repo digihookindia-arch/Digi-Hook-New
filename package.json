@@ -21,7 +21,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx lib/enquiry.test.ts && tsx lib/delivery.test.ts && tsx lib/money.test.ts && tsx lib/gst.test.ts && tsx lib/phone.test.ts && tsx lib/leadSheet.test.ts && tsx lib/leadTemplates.test.ts && tsx lib/leadCrm.test.ts && tsx lib/journey.test.ts && tsx lib/portal.test.ts && tsx lib/seoAudit.test.ts && tsx lib/seoWork.test.ts",
+    "test": "tsx lib/enquiry.test.ts && tsx lib/delivery.test.ts && tsx lib/money.test.ts && tsx lib/gst.test.ts && tsx lib/phone.test.ts && tsx lib/leadSheet.test.ts && tsx lib/leadTemplates.test.ts && tsx lib/leadCrm.test.ts && tsx lib/when.test.ts && tsx lib/journey.test.ts && tsx lib/portal.test.ts && tsx lib/seoAudit.test.ts && tsx lib/seoWork.test.ts",
     "seo": "node scripts/seo-check.mjs"
   },
   "dependencies": {

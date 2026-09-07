@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { reviseProposalAction, type DraftState } from '../actions';
+import { istTime } from '@/lib/when';
 
 /** Plain-English revision box — the AI editing surface for the team. */
 export function ReviseForm({ slug }: { slug: string }) {
@@ -64,7 +65,7 @@ export function ReviseForm({ slug }: { slug: string }) {
           role="status"
           className="m-0 mt-4 border-l-2 border-text py-1 pl-4 text-[14.5px] leading-[1.55] text-neutral-800"
         >
-          Revised at {new Date(state.revisedAt).toLocaleTimeString('en-IN')}. The
+          Revised at {istTime(state.revisedAt)}. The
           preview below and the client&apos;s copy are both updated.
         </p>
       ) : null}

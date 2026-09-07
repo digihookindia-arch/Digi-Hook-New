@@ -25,6 +25,7 @@ import {
   isRankDataConfigured,
 } from './dataForSeo';
 import type { PortalProject } from './portalProjects';
+import { istToday } from './when';
 
 /**
  * Storage for the SEO work record — activity log, deliverables, monthly
@@ -88,7 +89,7 @@ export async function addActivity(
     reason: input.reason,
     evidence: input.evidence,
     result: input.result,
-    happenedOn: input.happenedOn ?? now.slice(0, 10),
+    happenedOn: input.happenedOn ?? istToday(),
     createdAt: now,
   };
   getDb()
@@ -523,7 +524,9 @@ export async function deleteReport(id: string, projectId: string): Promise<void>
 export type RunOutcome = 'done' | 'fresh' | 'failed' | 'not-configured' | 'no-url' | 'spend-cap';
 
 const hoursAgo = (iso: string) => (Date.now() - Date.parse(iso)) / 3_600_000;
-const today = () => new Date().toISOString().slice(0, 10);
+// Today in Noida, not in UTC. After 18:30 IST those are different days, so
+// a check run on a September evening would be filed against the day before.
+const today = () => istToday();
 
 /* PageSpeed */
 
