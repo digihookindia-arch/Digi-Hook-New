@@ -23,6 +23,14 @@ yarn-error.log*
 .env*.local
 .env
 
+# Service-account keys. These are private keys, not config: the Google Sheets /
+# Search Console key lands here as gsc-key.json, and anything matching the
+# console's own download name is caught too, because the one that gets
+# committed is always the one nobody renamed.
+gsc-key.json
+*-service-account*.json
+*.iam.gserviceaccount.com.json
+
 # sqlite (proposal storage)
 /data
 
