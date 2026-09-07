@@ -62,6 +62,23 @@ export type WhatsappMessage = {
   name: string;
   /** Fills {{1}}, {{2}}, … in that order. Must match the approved template. */
   params: string[];
+  /**
+   * The image for a template with a media header.
+   *
+   * WhatsApp will not render styled text — no HTML, no CSS, no fonts, no
+   * colours, on any plan — so this image is the only surface the studio's
+   * design reaches. It is brand furniture, identical for every recipient.
+   *
+   * AiSensy fetches it, so the URL must be publicly reachable. **Never point
+   * this at anything client-specific**: a tax invoice or a proposal carries a
+   * name, an address and a GSTIN, and none of that belongs behind a public
+   * URL. Those go by email, addressed to a person.
+   *
+   * Omitted unless the matching template was approved *with* a media header —
+   * sending media to a template that has none is rejected, and sending none to
+   * a template that expects one is rejected too. The two must agree.
+   */
+  media?: { url: string; filename: string };
 };
 
 export type SendResult =
@@ -107,6 +124,7 @@ export async function sendWhatsapp(message: WhatsappMessage): Promise<SendResult
         userName: message.name.slice(0, 100),
         source: 'digihook.in',
         templateParams: message.params,
+        ...(message.media ? { media: message.media } : {}),
       }),
       signal: AbortSignal.timeout(20000),
     });
