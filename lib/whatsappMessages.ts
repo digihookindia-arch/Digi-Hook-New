@@ -42,28 +42,31 @@ function header(name: HeaderName) {
  *
  *   Hi {{1}}, your proposal from Digi Hook is ready to read.
  *   {{2}}
- *   Access code: {{3}}
  *
- *   Any questions, just reply here.
+ *   The access code is in the email we just sent you. Any questions, just
+ *   reply here.
  *
- * The closing line is not decoration: Meta rejects a body that ends on a
- * variable. It is static text, so the parameter count is unchanged.
+ * **The access code is deliberately not sent here.** Meta rejected this
+ * template while it read "Access code: {{3}}": anything resembling a one-time
+ * code belongs to the AUTHENTICATION category, and a Utility template carrying
+ * one is refused. The rule is worth agreeing with rather than working around —
+ * an access code is a credential, and pushing a credential down a channel the
+ * client did not ask for is the thing it exists to discourage. The email
+ * carries it, addressed to a person.
+ *
+ * The closing line also keeps the body from ending on a variable, which Meta
+ * rejects separately.
  */
 export function proposalReadyWhatsapp(input: {
   name: string;
   phone: string;
   slug: string;
-  accessCode: string;
 }): WhatsappMessage {
   return {
     campaign: 'proposalReady',
     phone: input.phone,
     name: input.name,
-    params: [
-      firstName(input.name),
-      `${SITE_URL}/proposals/${input.slug}`,
-      input.accessCode,
-    ],
+    params: [firstName(input.name), `${SITE_URL}/proposals/${input.slug}`],
     media: header('proposal-ready'),
   };
 }

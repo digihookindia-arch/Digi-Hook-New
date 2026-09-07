@@ -87,7 +87,6 @@ export async function sendMilestoneAction(formData: FormData): Promise<void> {
         name: journey.proposal.client,
         phone: journey.proposal.clientPhone,
         slug: journey.proposal.slug,
-        accessCode: journey.proposal.accessCode,
       })
     );
   }

@@ -78,12 +78,14 @@ console.log('\n— template parameters are positional, so pin the order —');
     name: 'Rajesh Kumar Sharma',
     phone: '9873674517',
     slug: '7d34593e-0000-4000-8000-000000000001',
-    accessCode: '123456',
   });
-  check('proposal ready sends three parameters', m.params.length === 3, m.params);
+  check('proposal ready sends two parameters', m.params.length === 2, m.params);
   check('  {{1}} is the first name only', m.params[0] === 'Rajesh');
   check('  {{2}} is the proposal link', m.params[1]?.includes('/proposals/') === true);
-  check('  {{3}} is the access code', m.params[2] === '123456');
+  // The access code is a credential and stays in the email. Meta refuses a
+  // Utility template that carries one, and is right to.
+  check('  the access code is never sent over WhatsApp',
+    m.params.every((p) => !/^d{6}$/.test(p)), m.params);
 }
 
 {
