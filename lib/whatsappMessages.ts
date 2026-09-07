@@ -1,6 +1,7 @@
 import { formatInr } from './money';
 import { proposalRef } from './proposalDoc';
 import { SITE_URL } from './site';
+import type { HeaderName } from './whatsappHeader';
 import type { WhatsappMessage } from './whatsapp';
 
 /**
@@ -19,7 +20,22 @@ import type { WhatsappMessage } from './whatsapp';
  *
  * Copy is deliberately short. These arrive on a phone, alongside messages from
  * family — the email carries the detail, and this carries the fact plus a link.
+ *
+ * Each carries a branded header image, which is the only place WhatsApp lets
+ * the studio's design show: the body is plain text by Meta's rule, on every
+ * plan. The image is brand furniture and identical for every recipient — see
+ * `lib/whatsappHeader.tsx` for why nothing client-specific may go in one.
+ *
+ * **Only send `media` to a template that was approved with a media header.**
+ * A template without one rejects the image, and a template with one rejects
+ * its absence. If a template is approved as text-only, drop the `header`
+ * argument for that builder rather than leaving a URL that will be refused.
  */
+
+/** Where AiSensy fetches the header image for a given message. */
+function header(name: HeaderName) {
+  return { url: `${SITE_URL}/whatsapp/${name}.png`, filename: `${name}.png` };
+}
 
 /**
  * 1 · Proposal ready
@@ -43,6 +59,7 @@ export function proposalReadyWhatsapp(input: {
       `${SITE_URL}/proposals/${input.slug}`,
       input.accessCode,
     ],
+    media: header('proposal-ready'),
   };
 }
 
@@ -61,6 +78,7 @@ export function proposalAcceptedWhatsapp(input: {
     phone: input.phone,
     name: input.name,
     params: [firstName(input.name)],
+    media: header('proposal-accepted'),
   };
 }
 
@@ -91,6 +109,7 @@ export function paymentDueWhatsapp(input: {
       formatInr(input.payableInr),
       `${SITE_URL}/proposals/${input.slug}/payment`,
     ],
+    media: header('payment-due'),
   };
 }
 
@@ -122,6 +141,7 @@ export function paymentReceivedWhatsapp(input: {
       // it names the proposal instead of a number that does not exist.
       input.invoiceNumber ?? `for proposal ${proposalRef(input.slug)}`,
     ],
+    media: header('payment-received'),
   };
 }
 
