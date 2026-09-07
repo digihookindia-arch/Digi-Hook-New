@@ -37,6 +37,23 @@ export const dynamic = 'force-dynamic';
  * message the same person — the losing one gets false and stays quiet. Messaging
  * a stranger twice is the failure mode worth engineering against here; the
  * first message is unsolicited enough.
+ *
+ * ## Three modes, because the first run is not like the others
+ *
+ * - `?dry=1` reads the sheet and reports what it *would* do. Writes nothing,
+ *   sends nothing. This is how you look at a sheet before trusting it.
+ * - `?backfill=1` imports without messaging, stamping each lead as already
+ *   welcomed so no later run picks it up either. **This is the correct first
+ *   run against an existing sheet.** The thank-you says a team member will
+ *   call within one working day; sending that to somebody who enquired six
+ *   weeks ago and heard nothing is worse than staying quiet, and on WhatsApp
+ *   it is how a business number gets reported. The backlog belongs in the
+ *   dashboard as leads to work by hand, not in 67 people's phones.
+ * - No parameter: the steady state. New rows only, each welcomed once.
+ *
+ * The modes are deliberately not inferred. "Is the database empty?" would make
+ * the behaviour depend on a condition nobody checked, and the one run that
+ * matters is the one where getting it wrong cannot be taken back.
  */
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET ?? '';
@@ -44,6 +61,9 @@ export async function GET(request: NextRequest) {
   if (!secret || given !== `Bearer ${secret}`) {
     return new NextResponse(null, { status: 404 });
   }
+
+  const dry = request.nextUrl.searchParams.get('dry') === '1';
+  const backfill = request.nextUrl.searchParams.get('backfill') === '1';
 
   if (!isLeadSheetConfigured()) {
     return NextResponse.json({ ok: false, reason: 'lead sheet not configured' });
@@ -67,6 +87,13 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
+    // Counted as it would have been imported, then left alone. A dry run that
+    // wrote "just the one row" would not be a dry run.
+    if (dry) {
+      imported++;
+      continue;
+    }
+
     const enquiry = await saveEnquiry({
       // The form's own first question, so the dashboard groups these the way
       // the website enquiries are already grouped.
@@ -85,14 +112,23 @@ export async function GET(request: NextRequest) {
     });
     imported++;
 
+    // Claim the welcome without sending it. The same conditional write, so a
+    // normal run afterwards finds the stamp already set and stays quiet — the
+    // backlog is closed to messaging permanently, not just for this pass.
+    if (backfill) {
+      await markWelcomed(enquiry.id);
+      continue;
+    }
+
     // The first answer is the website type, which the reply names back.
     if (await welcome(enquiry, lead.answers[0]?.value ?? '')) welcomed++;
   }
 
   return NextResponse.json({
     ok: true,
+    mode: dry ? 'dry — nothing written, nothing sent' : backfill ? 'backfill — imported without messaging' : 'live',
     rows: sheet.leads.length,
-    imported,
+    [dry ? 'wouldImport' : 'imported']: imported,
     alreadyKnown: already,
     welcomed,
     unusableRows: sheet.skipped,
