@@ -97,15 +97,13 @@ export default async function EnquiryPage({
                   when you ring. Three states, not two: "imported with the
                   backlog" is a deliberate silence and must never read as a
                   message that was sent. */}
-              {enquiry.source === 'sheet' ? (
-                <span className="text-[13px] leading-[1.4] text-neutral-700">
-                  {enquiry.welcomedAt
-                    ? `Thank-you sent ${istShort(enquiry.welcomedAt)}`
-                    : enquiry.welcomeSkippedAt
-                      ? 'Imported with the backlog — no automatic message was sent'
-                      : 'No automatic thank-you has gone to this lead yet'}
-                </span>
-              ) : null}
+              <span className="text-[13px] leading-[1.4] text-neutral-700">
+                {enquiry.welcomedAt
+                  ? `Thank-you sent ${istShort(enquiry.welcomedAt)}`
+                  : enquiry.welcomeSkippedAt
+                    ? 'Imported with the backlog — no automatic message was sent'
+                    : 'No automatic thank-you has gone to this lead yet'}
+              </span>
             </div>
           </div>
           <Link

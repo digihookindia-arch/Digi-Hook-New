@@ -4,8 +4,10 @@ import { detailQuestions } from '@/content/enquiry';
 import { sendEmail, STUDIO_INBOX } from '@/lib/email';
 import { enquiryReceivedEmail } from '@/lib/milestoneEmails';
 import { sendMilestone } from '@/lib/sentEmails';
-import { saveEnquiry, type Enquiry } from '@/lib/enquiries';
+import { markWelcomed, saveEnquiry, type Enquiry } from '@/lib/enquiries';
 import { SITE_URL } from '@/lib/site';
+import { sendWhatsapp } from '@/lib/whatsapp';
+import { newLeadWhatsapp } from '@/lib/whatsappMessages';
 import {
   isServiceKey,
   questionsFor,
@@ -111,13 +113,34 @@ export async function submitEnquiry(
   return { status: 'success', errors: {} };
 }
 
-/** Acknowledgement to the client, and the brief to the studio. */
+/**
+ * Acknowledgement to the client, and the brief to the studio.
+ *
+ * The client is answered on both channels, the same as somebody who arrives
+ * through a Meta lead ad. Both land in the same enquiry section and both are
+ * strangers waiting to hear back, so treating them differently only meant the
+ * person who came to the website directly heard less.
+ *
+ * The WhatsApp reuses the approved new-lead template rather than needing one of
+ * its own: "thanks for your enquiry, somebody will call within a working day"
+ * is exactly as true here.
+ */
 async function notify(enquiry: Enquiry): Promise<void> {
   const brief = enquiry.summary
     .map((r) => `  ${r.label}: ${r.value}`)
     .join('\n');
 
+  // Claimed before sending, the same rule the lead sync uses: a person who
+  // double-submits the form must not be messaged twice.
+  const claimed = await markWelcomed(enquiry.id);
+
   await Promise.all([
+    // Never throws — a WhatsApp outage must not cost the acknowledgement email
+    // beside it, and an unusable number is skipped rather than guessed at.
+    claimed
+      ? sendWhatsapp(newLeadWhatsapp({ name: enquiry.name, phone: enquiry.phone }))
+      : Promise.resolve(),
+
     // Through the send log, not sendEmail directly — this is stage 1 of the
     // same four the dashboard sends by hand, and it belongs in the same
     // history. Without the row, the panel would show the one email that fires
