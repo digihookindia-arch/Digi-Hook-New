@@ -4,6 +4,7 @@ import {
   getEnquiryByExternalId,
   markWelcomeSkipped,
   markWelcomed,
+  pendingWelcomes,
   saveEnquiry,
   type Enquiry,
 } from '@/lib/enquiries';
@@ -132,6 +133,19 @@ export async function GET(request: NextRequest) {
     if (outcome.claimed) welcomed++;
     if (outcome.whatsapp) whatsapp[outcome.whatsapp] = (whatsapp[outcome.whatsapp] ?? 0) + 1;
     if (outcome.email) email[outcome.email] = (email[outcome.email] ?? 0) + 1;
+  }
+
+  // Leads imported earlier that are still owed a welcome — a backfilled row
+  // the studio has since released, or one whose send failed before the stamp
+  // was taken. Skipped entirely in dry and backfill mode, which promise not
+  // to message anybody.
+  if (!dry && !backfill) {
+    for (const lead of await pendingWelcomes()) {
+      const outcome = await welcome(lead, lead.summary[0]?.value ?? '');
+      if (outcome.claimed) welcomed++;
+      if (outcome.whatsapp) whatsapp[outcome.whatsapp] = (whatsapp[outcome.whatsapp] ?? 0) + 1;
+      if (outcome.email) email[outcome.email] = (email[outcome.email] ?? 0) + 1;
+    }
   }
 
   return NextResponse.json({

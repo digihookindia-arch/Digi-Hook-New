@@ -420,6 +420,30 @@ export async function markWelcomeSkipped(id: string): Promise<boolean> {
 }
 
 /**
+ * Imported leads still owed their automatic thank-you.
+ *
+ * The sync used to welcome only the rows it created in that same pass, so a
+ * lead whose stamps were cleared afterwards was never revisited and the
+ * clearing did nothing. The stamp is what decides, not whether the row happens
+ * to be new.
+ *
+ * Restricted to `sheet` on purpose: a website enquiry has no welcome stamp
+ * either, and it already got its own acknowledgement when the form was
+ * submitted. Widening this would message every one of them again.
+ */
+export async function pendingWelcomes(): Promise<Enquiry[]> {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM enquiries
+        WHERE source = 'sheet'
+          AND welcomed_at IS NULL AND welcome_skipped_at IS NULL
+        ORDER BY COALESCE(submitted_at, created_at) ASC`
+    )
+    .all() as Row[];
+  return rows.map(toEnquiry);
+}
+
+/**
  * Clears both stamps so the next sync messages this lead after all. For a lead
  * imported by the backfill that should have been welcomed — the studio's call,
  * never automatic.
