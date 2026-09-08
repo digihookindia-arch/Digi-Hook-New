@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { STUDIO_INBOX, sendEmail } from '@/lib/email';
 import {
   getEnquiryByExternalId,
+  markWelcomeSkipped,
   markWelcomed,
   saveEnquiry,
   type Enquiry,
@@ -79,6 +80,10 @@ export async function GET(request: NextRequest) {
   let imported = 0;
   let already = 0;
   let welcomed = 0;
+  // Tallied per channel so a template or mailbox that is refusing every
+  // message shows up in the response, not only in the log.
+  const whatsapp: Record<string, number> = {};
+  const email: Record<string, number> = {};
 
   for (const lead of sheet.leads) {
     const existing = await getEnquiryByExternalId(lead.externalId);
@@ -118,12 +123,15 @@ export async function GET(request: NextRequest) {
     // normal run afterwards finds the stamp already set and stays quiet — the
     // backlog is closed to messaging permanently, not just for this pass.
     if (backfill) {
-      await markWelcomed(enquiry.id);
+      await markWelcomeSkipped(enquiry.id);
       continue;
     }
 
     // The first answer is the website type, which the reply names back.
-    if (await welcome(enquiry, lead.answers[0]?.value ?? '')) welcomed++;
+    const outcome = await welcome(enquiry, lead.answers[0]?.value ?? '');
+    if (outcome.claimed) welcomed++;
+    if (outcome.whatsapp) whatsapp[outcome.whatsapp] = (whatsapp[outcome.whatsapp] ?? 0) + 1;
+    if (outcome.email) email[outcome.email] = (email[outcome.email] ?? 0) + 1;
   }
 
   return NextResponse.json({
@@ -133,6 +141,8 @@ export async function GET(request: NextRequest) {
     [dry ? 'wouldImport' : 'imported']: imported,
     alreadyKnown: already,
     welcomed,
+    ...(Object.keys(whatsapp).length ? { whatsapp } : {}),
+    ...(Object.keys(email).length ? { email } : {}),
     unusableRows: sheet.skipped,
     testLeadsIgnored: sheet.testLeads,
     ...(isReadingPublicly() ? { warning: 'sheet is being read with no credentials' } : {}),
@@ -166,14 +176,24 @@ function sourceLine(lead: SheetLead): string {
  * The thank-you, on both channels, once. Claims the right to send *before*
  * sending: a duplicate message to a stranger is worse than a missed one, so
  * the stamp is taken first and a failure afterwards is not retried.
+ *
+ * **Reports what actually happened.** Both sends used to be fire-and-forget,
+ * logged at most — so when the WhatsApp template turned out to expect a
+ * different number of variables, every message was rejected and the only
+ * symptom was leads quietly hearing nothing. The counts now come back in the
+ * route's response, where a failing channel is visible on the first run rather
+ * than whenever somebody happens to read the logs.
  */
-async function welcome(enquiry: Enquiry, wants: string): Promise<boolean> {
-  if (!(await markWelcomed(enquiry.id))) return false;
+type WelcomeOutcome = { claimed: boolean; whatsapp?: string; email?: string };
 
-  await sendWhatsapp(
-    newLeadWhatsapp({ name: enquiry.name, phone: enquiry.phone, wants })
+async function welcome(enquiry: Enquiry, wants: string): Promise<WelcomeOutcome> {
+  if (!(await markWelcomed(enquiry.id))) return { claimed: false };
+
+  const wa = await sendWhatsapp(
+    newLeadWhatsapp({ name: enquiry.name, phone: enquiry.phone })
   );
 
+  let email = 'no address on the lead';
   if (enquiry.email) {
     try {
       await sendEmail({
@@ -181,9 +201,12 @@ async function welcome(enquiry: Enquiry, wants: string): Promise<boolean> {
         ...newLeadEmail({ name: enquiry.name, wants }),
         replyTo: STUDIO_INBOX,
       });
+      email = 'sent';
     } catch (e) {
       console.error('[leads] welcome email failed', enquiry.id, e);
+      email = 'failed';
     }
   }
-  return true;
+
+  return { claimed: true, whatsapp: wa.sent ? 'sent' : wa.reason, email };
 }

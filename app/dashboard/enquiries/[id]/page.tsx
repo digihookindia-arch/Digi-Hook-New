@@ -21,6 +21,7 @@ import { ClientUpdates } from '@/components/ClientUpdates';
 import { FollowUpPicker } from '@/components/FollowUpPicker';
 import { requireSession } from '../../actions';
 import { removeEnquiry, sendMilestoneAction, updateLeadAction } from '../actions';
+import { istShort } from '@/lib/when';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,12 +94,16 @@ export default async function EnquiryPage({
                 </span>
               ) : null}
               {/* Whether the automatic thank-you has gone changes what you say
-                  when you ring: they have either heard from us or they have not. */}
+                  when you ring. Three states, not two: "imported with the
+                  backlog" is a deliberate silence and must never read as a
+                  message that was sent. */}
               {enquiry.source === 'sheet' ? (
                 <span className="text-[13px] leading-[1.4] text-neutral-700">
                   {enquiry.welcomedAt
-                    ? `Thank-you sent ${noteTime.format(new Date(enquiry.welcomedAt))}`
-                    : 'No automatic thank-you has gone to this lead'}
+                    ? `Thank-you sent ${istShort(enquiry.welcomedAt)}`
+                    : enquiry.welcomeSkippedAt
+                      ? 'Imported with the backlog — no automatic message was sent'
+                      : 'No automatic thank-you has gone to this lead yet'}
                 </span>
               ) : null}
             </div>

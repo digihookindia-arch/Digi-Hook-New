@@ -100,6 +100,12 @@ export type Enquiry = {
    * Null for rows written before this existed; fall back to createdAt.
    */
   submittedAt: string | null;
+  /**
+   * Set when a lead was imported deliberately without being messaged.
+   * Distinct from welcomedAt, which means a message actually went out -
+   * the dashboard has to be able to tell a studio those are different.
+   */
+  welcomeSkippedAt: string | null;
 };
 
 type Row = {
@@ -119,6 +125,7 @@ type Row = {
   welcomed_at: string | null;
   follow_up_at: string | null;
   submitted_at: string | null;
+  welcome_skipped_at: string | null;
 };
 
 function toEnquiry(row: Row): Enquiry {
@@ -150,6 +157,7 @@ function toEnquiry(row: Row): Enquiry {
     welcomedAt: row.welcomed_at,
     followUpAt: row.follow_up_at,
     submittedAt: row.submitted_at,
+    welcomeSkippedAt: row.welcome_skipped_at,
   };
 }
 
@@ -190,6 +198,7 @@ export async function saveEnquiry(input: {
     welcomedAt: null,
     followUpAt: null,
     submittedAt: parseInstant(input.submittedAt) ?? createdAt,
+    welcomeSkippedAt: null,
   };
 
   getDb()
@@ -382,9 +391,45 @@ export async function noteCounts(): Promise<Map<string, number>> {
  */
 export async function markWelcomed(id: string): Promise<boolean> {
   const result = getDb()
-    .prepare('UPDATE enquiries SET welcomed_at = ? WHERE id = ? AND welcomed_at IS NULL')
+    .prepare(
+      `UPDATE enquiries SET welcomed_at = ?
+        WHERE id = ? AND welcomed_at IS NULL AND welcome_skipped_at IS NULL`
+    )
     .run(new Date().toISOString(), id);
   return Number(result.changes) > 0;
+}
+
+/**
+ * Records that a lead was imported on purpose without being messaged — the
+ * backfill's stamp.
+ *
+ * Its own column rather than reusing `welcomed_at`, because the dashboard has
+ * to tell the studio which of the two happened. Sharing one column made the
+ * lead page report "Thank-you sent" against seventy-five strangers who had
+ * heard nothing, which is worse than showing no information at all: it is the
+ * kind of wrong that stops anyone checking.
+ */
+export async function markWelcomeSkipped(id: string): Promise<boolean> {
+  const result = getDb()
+    .prepare(
+      `UPDATE enquiries SET welcome_skipped_at = ?
+        WHERE id = ? AND welcomed_at IS NULL AND welcome_skipped_at IS NULL`
+    )
+    .run(new Date().toISOString(), id);
+  return Number(result.changes) > 0;
+}
+
+/**
+ * Clears both stamps so the next sync messages this lead after all. For a lead
+ * imported by the backfill that should have been welcomed — the studio's call,
+ * never automatic.
+ */
+export async function clearWelcomeStamp(id: string): Promise<void> {
+  getDb()
+    .prepare(
+      'UPDATE enquiries SET welcomed_at = NULL, welcome_skipped_at = NULL WHERE id = ?'
+    )
+    .run(id);
 }
 
 /** Look a lead up by its Meta lead-ad row id, to avoid importing it twice. */

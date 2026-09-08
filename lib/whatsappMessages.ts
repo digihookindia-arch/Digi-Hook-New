@@ -187,16 +187,18 @@ export function paymentReceivedWhatsapp(input: {
 export function newLeadWhatsapp(input: {
   name: string;
   phone: string;
-  /** What they said they wanted, already humanised. */
-  wants: string;
 }): WhatsappMessage {
   return {
     campaign: 'newLead',
     phone: input.phone,
     name: input.name,
-    // Falls back to "website" so the sentence still reads if the form ever
-    // stops asking, rather than leaving a hole mid-message.
-    params: [firstName(input.name), (input.wants || 'website').toLowerCase()],
+    // One variable, because that is what the approved template carries. This
+    // sent two until 2026-09-08 and every message was rejected with "Template
+    // params does not match the campaign" — logged, never surfaced, so a lead
+    // simply heard nothing. If a second variable is ever added in AiSensy and
+    // re-approved, the website type is what belongs in it, and this changes in
+    // the same pass.
+    params: [firstName(input.name)],
   };
 }
 

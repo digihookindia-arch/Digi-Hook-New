@@ -163,7 +163,8 @@ const SCHEMA = `
     external_id   TEXT,
     welcomed_at   TEXT,
     follow_up_at  TEXT,
-    submitted_at  TEXT
+    submitted_at  TEXT,
+    welcome_skipped_at TEXT
   );
   /*
    * enquiries_external is NOT here. It indexes external_id, which is added by
@@ -678,6 +679,11 @@ export function getDb(): DatabaseSync {
     // sheet was submitted days or weeks before we saw it, and showing the
     // import date made 69 leads all look like they arrived the same morning.
     addColumnIfMissing(db, 'enquiries', 'submitted_at', 'TEXT');
+    // Set when a lead was imported deliberately WITHOUT being messaged (the
+    // backfill). Separate from welcomed_at, which means a message actually
+    // went: one column for both made the dashboard claim 75 strangers had
+    // been thanked when none had.
+    addColumnIfMissing(db, 'enquiries', 'welcome_skipped_at', 'TEXT');
 
     createLateIndexes(db);
     global._dhSqlite = db;
