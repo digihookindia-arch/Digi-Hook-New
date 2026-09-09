@@ -384,8 +384,15 @@ export const workSection = {
   // to watch, and this section's whole argument is that it deals in the latter.
   reviewLabel: 'Client review',
   reviewCta: 'Play the review',
-  /** Falls back to this when the speaker's name is not yet confirmed. */
-  reviewUnattributed: 'Filmed for',
+  /**
+   * Falls back to this when the speaker's name is not yet confirmed.
+   *
+   * **"by", not "for"** (studio's correction, 2026-09-09). Both reviews were
+   * filmed by the clients themselves and sent in — nobody was briefed or
+   * directed, which is the more credible claim of the two and the accurate one.
+   * "Filmed for Rosa Dori" read as though the studio had commissioned it.
+   */
+  reviewUnattributed: 'Filmed by',
   scoresLabel: 'Measured',
   techLabel: 'Built with',
   renderingLabel: 'Rendering',
