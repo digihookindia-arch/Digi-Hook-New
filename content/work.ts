@@ -205,11 +205,15 @@ export const work: WorkItem[] = [
     shot: '/work/10pennykitchens.webp',
     shotAlt:
       'Home page of 10pennykitchens.com — a full-width photograph of a pale grey handleless kitchen with lit under-cabinet strips and a bowl of fruit on the island, under the 10 Penny Kitchens & Wardrobes wordmark.',
-    // Two PSI runs on an idle server read 84 then 88; the later one is
-    // published. A rebuilt site is a different site — this is not the 94 the
-    // static export scored in August, and it should not be carried over.
-    scores: { performance: 88, accessibility: 97, bestPractices: 100, seo: 100 },
-    measured: '2026-09-07',
+    // Performance here is the studio's own PageSpeed reading, published at the
+    // studio's direction (2026-09-09). Note before changing it either way: runs
+    // from the VPS have not reproduced it — 84 and 88 on 2026-09-07, 85 on
+    // 2026-09-09, all PSI mobile on an idle box (desktop reads lower still, 72).
+    // The other three categories are those runs' figures, which agree. Do not
+    // silently "correct" performance to a fresh measurement, and do not treat
+    // the disagreement as settled: if a run ever reproduces it, drop this note.
+    scores: { performance: 94, accessibility: 97, bestPractices: 100, seo: 100 },
+    measured: '2026-09-09',
     strategy: 'mobile',
     source: 'PageSpeed Insights',
     tech: ['Next.js', 'React', 'Tailwind CSS', 'Node.js', 'Nginx'],
