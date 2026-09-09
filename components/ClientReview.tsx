@@ -23,6 +23,18 @@ import { workSection, type WorkReview } from '@/content/work';
  * those, but it sits in the same section and there is no reason to re-litigate
  * a regression that has already been paid for once.
  */
+/**
+ * Two caps, not one, because the two reviews are limited by different edges.
+ *
+ * MAX_WIDTH is the 760px the landscape master was designed to sit at, and it is
+ * what still decides that one (760 x 9/20 = 342 tall, well inside the height
+ * cap). MAX_HEIGHT is what decides the portrait one, which would otherwise be
+ * 760 x 1343 — taller than the viewport it appears in, for a card inside a
+ * card. At 520 it lands at a phone-shaped 294 x 520.
+ */
+const MAX_WIDTH = 760;
+const MAX_HEIGHT = 520;
+
 export function ClientReview({
   review,
   siteName,
@@ -34,6 +46,7 @@ export function ClientReview({
   const boxRef = useRef<HTMLDivElement>(null);
   const [nearView, setNearView] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const ratio = review.width / review.height;
 
   useEffect(() => {
     const el = boxRef.current;
@@ -68,17 +81,27 @@ export function ClientReview({
         {s.reviewLabel}
       </div>
 
-      <div className="max-w-[760px] border border-neutral-300 bg-bg">
-        {/* 20:9 is the master's own shape (1280x576). Fixing it here keeps the
-            poster and the player the same height, so the click does not jump
-            the page — the section below would otherwise shift under the cursor. */}
+      {/* The frame is the master's own shape, read off the file rather than
+          fixed here: one review is a 20:9 camera master, the other a 9:16 phone
+          recording, and a shared ratio would crop whichever one it did not fit
+          to a strip of somebody's face. Poster and player use the same box, so
+          the click does not jump the page — the section below would otherwise
+          shift under the cursor. Width and height are both capped, because the
+          two shapes run into different edges — see MAX_WIDTH / MAX_HEIGHT. */}
+      <div
+        className="border border-neutral-300 bg-bg"
+        style={{
+          maxWidth: `min(100%, ${MAX_WIDTH}px, ${Math.round(MAX_HEIGHT * ratio)}px)`,
+        }}
+      >
         <div
           ref={boxRef}
-          className="relative aspect-[20/9] w-full overflow-hidden bg-neutral-200"
+          className="relative w-full overflow-hidden bg-neutral-200"
+          style={{ aspectRatio: `${review.width} / ${review.height}` }}
         >
           {playing ? (
             <video
-              className="absolute inset-0 block h-full w-full bg-text object-cover"
+              className="absolute inset-0 block h-full w-full bg-text object-contain"
               src={review.src}
               poster={review.poster}
               controls
@@ -109,9 +132,9 @@ export function ClientReview({
                 <Image
                   src={review.poster}
                   alt={review.posterAlt}
-                  width={1280}
-                  height={576}
-                  sizes="(max-width: 800px) 100vw, 760px"
+                  width={review.width}
+                  height={review.height}
+                  sizes={`min(100vw, ${MAX_WIDTH}px, ${Math.round(MAX_HEIGHT * ratio)}px)`}
                   className="block h-full w-full object-cover"
                 />
               )}

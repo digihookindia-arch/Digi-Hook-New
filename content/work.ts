@@ -19,7 +19,22 @@
  *       npx lighthouse@12 <url> --preset=desktop --output=json \
  *         --only-categories=performance,accessibility,best-practices,seo
  *
- *  2. **Never invent client names.** These three are real, live and shipped.
+ *     **Measure through PageSpeed Insights rather than that CLI, and read
+ *     `source` before comparing two numbers.** Both ways of getting this
+ *     wrong have already happened on this page:
+ *
+ *       - Keyless PSI shares one anonymous quota with the whole internet and
+ *         429s, which is what pushed an earlier pass onto the local CLI. It
+ *         read five to fourteen points *lower* on the same pages — Google
+ *         runs Lighthouse on its own hardware, and a laptop is not that. The
+ *         key is in the server's .env.local; run PSI from the VPS.
+ *       - A later pass ran while the VPS was building and restarting a
+ *         deploy. **The client sites share that box with digihook.in**, so
+ *         the reading measured the deploy: ramdelotraders came back 80 under
+ *         load and 91 on an idle server. Check `uptime` first, and re-run
+ *         anything that looks off.
+ *
+ *  2. **Never invent client names.** These six are real, live and shipped.
  *     Do not add an entry here for a site the studio did not build.
  *
  * `shot` files are 1440x900 WebP captures in `public/work/`, taken at
@@ -65,6 +80,14 @@ export type WorkReview = {
   /** Still frame from the video itself — never a stock portrait. */
   poster: string;
   posterAlt: string;
+  /**
+   * The encode's own pixel dimensions. Not decoration: `ClientReview` sizes its
+   * box from them, and the two reviews on this page are different shapes — one
+   * landscape master filmed on a camera, one portrait filmed on a phone. A
+   * fixed frame would crop a vertical review to a horizontal strip of a face.
+   */
+  width: number;
+  height: number;
   /** Runtime, printed on the play button so nobody clicks into an unknown. */
   duration: string;
   /**
@@ -184,6 +207,8 @@ export const work: WorkItem[] = [
       poster: '/work/totravelistolearn-review-poster.webp',
       posterAlt:
         'Still from the review video: the client speaking to camera in a white room, in front of a row of framed prints.',
+      width: 1280,
+      height: 576,
       duration: '0:49',
       speaker: '',
       speakerRole: '',
@@ -191,8 +216,66 @@ export const work: WorkItem[] = [
     },
   },
   {
-    id: '10penny',
+    id: 'apnaheaven',
     num: '03',
+    category: 'Real estate',
+    name: 'Apna Heaven',
+    domain: 'apnaheaven.com',
+    url: 'https://apnaheaven.com/',
+    blurb:
+      'A property consultancy’s site for Noida, Greater Noida and the Yamuna Expressway. A page per project, browsable by developer or by location, with an enquiry route on every one of them.',
+    shot: '/work/apnaheaven.webp',
+    shotAlt:
+      'Home page of apnaheaven.com — a dusk photograph of curved high-rise towers behind trees, with the heading “Apna Heaven” above buttons reading Explore Properties and Book a Consultation.',
+    scores: { performance: 98, accessibility: 95, bestPractices: 100, seo: 100 },
+    measured: '2026-09-07',
+    strategy: 'mobile',
+    source: 'PageSpeed Insights',
+    tech: ['Next.js', 'React', 'Tailwind CSS', 'Node.js', 'Nginx'],
+    rendering: 'SSR',
+    renderingNote:
+      'Assembled on the server for each visit, so a project that changes during the day is never served from yesterday’s copy.',
+  },
+  {
+    id: 'therosadori',
+    num: '04',
+    category: 'Brand catalogue',
+    name: 'Rosa Dori',
+    domain: 'therosadori.com',
+    url: 'https://therosadori.com/',
+    blurb:
+      'A natural-fibre bag label’s catalogue, built for buyers rather than baskets: four collections, a sustainability section, and an enquiry as the only call to action.',
+    shot: '/work/therosadori.webp',
+    shotAlt:
+      'Home page of therosadori.com — a photograph of jute and cotton bags arranged on a terrace table above a lake, under the Rosa Dori wordmark.',
+    scores: { performance: 98, accessibility: 91, bestPractices: 100, seo: 100 },
+    measured: '2026-09-07',
+    strategy: 'mobile',
+    source: 'PageSpeed Insights',
+    tech: ['Next.js', 'React', 'CSS Modules', 'next/image', 'Nginx'],
+    rendering: 'SSR',
+    renderingNote:
+      'Rendered on the server for each visit — the collections stay editable without a deploy behind them.',
+    // Supplied by the client, 2026-09-09. Filmed on a phone, so this one is
+    // portrait where the other is landscape — see `width`/`height`.
+    // `speaker`/`speakerRole` stay empty until the name and title are
+    // confirmed in writing; see the note on `WorkReview`.
+    review: {
+      src: '/work/rosadori-review.mp4',
+      poster: '/work/rosadori-review-poster.webp',
+      posterAlt:
+        'Still from the review video: the client speaking to camera at a desk, with a framed print on the wall behind and a curtain lit from above.',
+      width: 480,
+      height: 848,
+      duration: '0:51',
+      speaker: '',
+      speakerRole: '',
+      captions: null,
+    },
+  },
+  {
+    id: '10penny',
+    num: '05',
     category: 'Portfolio',
     name: '10 Penny Kitchens & Wardrobes',
     // Moved off 10penny.digihook.in to its own domain, and rebuilt on the way:
@@ -221,45 +304,9 @@ export const work: WorkItem[] = [
     renderingNote:
       'Pre-built and refreshed in the background on a five-minute window, so the project pages change without a rebuild.',
   },
-  /*
-   * Measured through PageSpeed Insights on 2026-09-07, on mobile, with the key
-   * in the server's .env.local. Two earlier passes were thrown away and both
-   * failures are worth knowing about:
-   *
-   *  1. Keyless PSI shares one anonymous quota with the whole internet and
-   *     429s, so the first pass fell back to the local Lighthouse CLI — which
-   *     read five to fourteen points lower on the same pages. Google runs
-   *     Lighthouse on its own hardware; a laptop is not that. Hence `source`.
-   *  2. The second pass ran while this VPS was building and restarting a
-   *     deploy. **These sites share the box with digihook.in**, so a reading
-   *     taken mid-deploy measures the deploy, not the site: ramdelotraders
-   *     came back 80 under load and 91 on an idle server. Never measure a
-   *     client site during a deploy, and re-run anything that looks off.
-   */
-  {
-    id: 'apnaheaven',
-    num: '04',
-    category: 'Real estate',
-    name: 'Apna Heaven',
-    domain: 'apnaheaven.com',
-    url: 'https://apnaheaven.com/',
-    blurb:
-      'A property consultancy’s site for Noida, Greater Noida and the Yamuna Expressway. A page per project, browsable by developer or by location, with an enquiry route on every one of them.',
-    shot: '/work/apnaheaven.webp',
-    shotAlt:
-      'Home page of apnaheaven.com — a dusk photograph of curved high-rise towers behind trees, with the heading “Apna Heaven” above buttons reading Explore Properties and Book a Consultation.',
-    scores: { performance: 98, accessibility: 95, bestPractices: 100, seo: 100 },
-    measured: '2026-09-07',
-    strategy: 'mobile',
-    source: 'PageSpeed Insights',
-    tech: ['Next.js', 'React', 'Tailwind CSS', 'Node.js', 'Nginx'],
-    rendering: 'SSR',
-    renderingNote:
-      'Assembled on the server for each visit, so a project that changes during the day is never served from yesterday’s copy.',
-  },
   {
     id: 'ramdelotraders',
-    num: '05',
+    num: '06',
     category: 'Ecommerce',
     name: 'Ramdelo Traders',
     domain: 'ramdelotraders.com',
@@ -280,27 +327,6 @@ export const work: WorkItem[] = [
     rendering: 'ISR',
     renderingNote:
       'Pre-built and refreshed in the background on a five-minute window, so prices and stock move without a rebuild.',
-  },
-  {
-    id: 'therosadori',
-    num: '06',
-    category: 'Brand catalogue',
-    name: 'Rosa Dori',
-    domain: 'therosadori.com',
-    url: 'https://therosadori.com/',
-    blurb:
-      'A natural-fibre bag label’s catalogue, built for buyers rather than baskets: four collections, a sustainability section, and an enquiry as the only call to action.',
-    shot: '/work/therosadori.webp',
-    shotAlt:
-      'Home page of therosadori.com — a photograph of jute and cotton bags arranged on a terrace table above a lake, under the Rosa Dori wordmark.',
-    scores: { performance: 98, accessibility: 91, bestPractices: 100, seo: 100 },
-    measured: '2026-09-07',
-    strategy: 'mobile',
-    source: 'PageSpeed Insights',
-    tech: ['Next.js', 'React', 'CSS Modules', 'next/image', 'Nginx'],
-    rendering: 'SSR',
-    renderingNote:
-      'Rendered on the server for each visit — the collections stay editable without a deploy behind them.',
   },
 ];
 
